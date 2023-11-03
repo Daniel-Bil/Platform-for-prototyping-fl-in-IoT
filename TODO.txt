@@ -5,7 +5,8 @@
 
 4. use Pytorch also
 5. good_looking gui
-
+6. Synthetic data generation
+7. broken timeline fixing <- power outages, and data mistakes
 
 WIDGET COLORS:
 1.  #33cccc    rgb(51, 204, 204)     hsl(180, 60%, 50%) <- buttons and others
@@ -14,11 +15,11 @@ WIDGET COLORS:
 
 
 METHODS:
+0. FedAvg
+1. FedProx
+2. FedPAQ
+3. Turbo-Aggregate  <- chyba w naszym przypadku useless bo komunikacja
+4. FedMA
+5. HierFAVG
 
-1.
-2.
-3.
-4.
-5.
-6.
-7.
+
