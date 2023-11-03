@@ -5,3 +5,20 @@
 
 4. use Pytorch also
 5. good_looking gui
+
+
+WIDGET COLORS:
+1.  #33cccc    rgb(51, 204, 204)     hsl(180, 60%, 50%) <- buttons and others
+2.  #669999    rgb(102, 153, 153)    hsl(180, 20%, 50%) <- bacground and other alike elements
+3.  rgb(255, 255, 255) <- text
+
+
+METHODS:
+
+1.
+2.
+3.
+4.
+5.
+6.
+7.
