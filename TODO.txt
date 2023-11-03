@@ -1,0 +1,7 @@
+1. For sensor and its data create chosen model and teach it after teaching every model merging according to chosen method
+
+2. better gui
+3. use existing methods
+
+4. use Pytorch also
+5. good_looking gui
