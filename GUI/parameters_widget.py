@@ -24,7 +24,7 @@ class ParametersHandler(QWidget):
         self.setMinimumWidth(450)
         self.mainGridLayout = QGridLayout()
         self.setLayout(self.mainGridLayout)
-        self.customEdit1 = CustomLabelEdit("parameter1")
+        self.customEdit1 = CustomLabelEdit("Number of sensors")
         self.customEdit2 = CustomLabelEdit("parameter2")
         self.customEdit3 = CustomLabelEdit("parameter3")
 

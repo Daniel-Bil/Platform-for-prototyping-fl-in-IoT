@@ -59,7 +59,7 @@ class PlatformWindow(QMainWindow):
         self.modelsCombo = QComboBox()
         self.modelsCombo.setMinimumHeight(70)
         self.modelsCombo.setMaximumWidth(250)
-        self.modelsCombo.setStyleSheet("background-color: DodgerBlue; font-size: 20px; border-radius 5px;")
+        self.modelsCombo.setStyleSheet("background-color: DodgerBlue; font-size: 20px; border-radius 10px; border: 3px solid #0033cc;")
         self.modelsCombo.addItem("Model Test")
         self.modelsCombo.addItem("Model Test2")
         self.horizontalLayout1.addWidget(self.label1)
