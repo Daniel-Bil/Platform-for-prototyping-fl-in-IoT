@@ -1,0 +1,17 @@
+
+
+
+CustomQPushButton {
+                   background-color: #33cccc;
+                   border: 2px solid #33cccc;
+                   color: #ffffff;
+                   border-radius: 8px;
+                   font-size: 20px;
+                   transition-duration: 1s;
+                  }
+
+
+CustomQPushButton:hover {
+                    background-color: #ffffff;
+                    color: #000000;
+                    }

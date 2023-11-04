@@ -8,6 +8,8 @@ import keras
 
 from GUI.button_widget import ButtonMenuHandler
 from GUI.custom_button import CustomQPushButton
+from GUI.parameters_widget import ParametersHandler
+
 
 class PlatformWindow(QMainWindow):
     def __init__(self):
@@ -15,6 +17,7 @@ class PlatformWindow(QMainWindow):
         self.setWindowTitle("Platform for prototyping federated learning in IoT")
         self.setGeometry(50, 50, 1600, 800)
         self.set_layout()
+        self.setStyleSheet("background-color: #669999;")
 
 
     def load_model(self):
@@ -34,7 +37,7 @@ class PlatformWindow(QMainWindow):
         self.horizontalLayout1 = QHBoxLayout()
         self.horizontalLayout1.setAlignment(Qt.AlignTop)
         self.horizontalLayout2 = QHBoxLayout()
-        self.horizontalLayout2.setAlignment(Qt.AlignRight)
+        # self.horizontalLayout2.setAlignment(Qt.AlignRight)
 
         self.horizontalLayout3 = QHBoxLayout()
 
@@ -43,7 +46,8 @@ class PlatformWindow(QMainWindow):
         self.mainLayout.addLayout(self.horizontalLayout3)
 
         self.pushButtonMenu = ButtonMenuHandler()
-        self.mainLayout.addWidget(self.pushButtonMenu)
+        self.parametersMenu = ParametersHandler()
+        self.horizontalLayout2.addWidget(self.parametersMenu)
         self.horizontalLayout2.addWidget(self.pushButtonMenu)
 
 
@@ -53,6 +57,9 @@ class PlatformWindow(QMainWindow):
 
         self.label1 = QLabel("models: ")
         self.modelsCombo = QComboBox()
+        self.modelsCombo.setMinimumHeight(70)
+        self.modelsCombo.setMaximumWidth(250)
+        self.modelsCombo.setStyleSheet("background-color: DodgerBlue; font-size: 20px; border-radius 5px;")
         self.modelsCombo.addItem("Model Test")
         self.modelsCombo.addItem("Model Test2")
         self.horizontalLayout1.addWidget(self.label1)

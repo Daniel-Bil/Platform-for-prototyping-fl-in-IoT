@@ -16,7 +16,7 @@ class ButtonMenuHandler(QWidget):
         self.setMinimumWidth(450)
         self.mainGridLayout = QGridLayout()
         self.setLayout(self.mainGridLayout)
-        self.customButton1 = CustomQPushButton("1")
+        self.customButton1 = CustomQPushButton("Load model")
         self.customButton2 = CustomQPushButton("2")
         self.customButton3 = CustomQPushButton("3")
 
@@ -26,7 +26,7 @@ class ButtonMenuHandler(QWidget):
 
         self.customButton7 = CustomQPushButton("7")
         self.customButton8 = CustomQPushButton("8")
-        self.customButton9 = CustomQPushButton("9")
+        self.customButton9 = CustomQPushButton("show results")
 
         self.mainGridLayout.addWidget(self.customButton1, 0, 0)
         self.mainGridLayout.addWidget(self.customButton2, 0, 1)
