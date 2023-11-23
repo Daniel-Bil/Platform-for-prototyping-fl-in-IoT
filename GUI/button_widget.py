@@ -17,8 +17,8 @@ class ButtonMenuHandler(QWidget):
         self.mainGridLayout = QGridLayout()
         self.setLayout(self.mainGridLayout)
         self.customButton1 = CustomQPushButton("Load model")
-        self.customButton2 = CustomQPushButton("2")
-        self.customButton3 = CustomQPushButton("3")
+        self.customButton2 = CustomQPushButton("Load data")
+        self.customButton3 = CustomQPushButton("Plot data")
 
         self.customButton4 = CustomQPushButton("4")
         self.customButton5 = CustomQPushButton("5")

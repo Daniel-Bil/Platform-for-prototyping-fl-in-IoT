@@ -28,7 +28,7 @@ class ParametersHandler(QWidget):
         self.customEdit2 = CustomLabelEdit("parameter2")
         self.customEdit3 = CustomLabelEdit("parameter3")
 
-        self.customEdit4 = CustomLabelEdit("parameter4")
+        self.customEdit4 = CustomLabelEdit("Number of epochs")
         self.customEdit5 = CustomLabelEdit("parameter5")
         self.customEdit6 = CustomLabelEdit("parameter6")
 
