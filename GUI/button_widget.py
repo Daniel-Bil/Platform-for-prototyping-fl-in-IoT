@@ -20,9 +20,9 @@ class ButtonMenuHandler(QWidget):
         self.customButton2 = CustomQPushButton("Load data")
         self.customButton3 = CustomQPushButton("Plot data")
 
-        self.customButton4 = CustomQPushButton("4")
-        self.customButton5 = CustomQPushButton("5")
-        self.customButton6 = CustomQPushButton("6")
+        self.customButton4 = CustomQPushButton("find good")
+        self.customButton5 = CustomQPushButton("plot good")
+        self.customButton6 = CustomQPushButton("find empty")
 
         self.customButton7 = CustomQPushButton("7")
         self.customButton8 = CustomQPushButton("8")

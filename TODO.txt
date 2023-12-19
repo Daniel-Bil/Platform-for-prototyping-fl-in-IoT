@@ -8,6 +8,15 @@
 6. Synthetic data generation
 7. broken timeline fixing <- power outages, and data mistakes
 
+find place of data outage and place of start of new data
+
+
+Rekonstrukcja
+https://www.nature.com/articles/s41598-020-59801-x
+https://stackabuse.com/autoencoders-for-image-reconstruction-in-python-and-keras/
+
+https://www.tensorflow.org/tutorials/generative/autoencoder
+
 WIDGET COLORS:
 1.  #33cccc    rgb(51, 204, 204)     hsl(180, 60%, 50%) <- buttons and others
 2.  #669999    rgb(102, 153, 153)    hsl(180, 20%, 50%) <- bacground and other alike elements
