@@ -34,10 +34,18 @@ class PlatformWindow(QMainWindow):
         self.good = None
 
     def load_model(self):
+        """
+        not used
+        :return:
+        """
         print(f"{self.modelsCombo.currentIndex()}  {self.modelsCombo.currentText()}")
 
 
     def read_data(self):
+        """
+        Reads data from given file inot pd dataframe and inot dict
+        :return:
+        """
         print("load data")
 
         files = os.listdir(f"{os.getcwd()}//dane")
@@ -61,6 +69,10 @@ class PlatformWindow(QMainWindow):
 
 
     def plot_data(self):
+        """
+        Plots whole data useless
+        :return:
+        """
         if self.oneFileDict is not None:
             t = np.arange(0, len(self.oneFileDict["time"]))
             plt.plot(t, self.oneFileDict["value_temp"], c='b', label="temperature")
@@ -74,6 +86,7 @@ class PlatformWindow(QMainWindow):
         #
         #     print(f"time:{self.oneFileDict['time'][i]} pvvalue:{self.oneFileDict['value_PV'][i]} dpv:{0 if i==0 or i==999 else self.oneFileDict['value_PV'][i]-self.oneFileDict['value_PV'][i+1]:^3.2f}")
     def find_good(self):
+        "finds good time series "
         self.good = find_interrupts(self.oneFileDict)
         for i, good in enumerate(self.good):
             v = self.check_time_differences(good["time"], timedelta(minutes=20))
@@ -84,6 +97,10 @@ class PlatformWindow(QMainWindow):
                print()
 
     def find_empty(self):
+        """
+        Finds time difference between all time series and return info about number of missed points
+        :return:
+        """
         if self.good is not None:
             for i in range(len(self.good)-1):
                 avg1,avg2 = [],[]
@@ -103,6 +120,10 @@ class PlatformWindow(QMainWindow):
                 # print(end - start)
 
     def plot_data_good(self):
+        """
+        plots data *NEEDS FIX*
+        :return:
+        """
         if self.good is not None:
             for i,good in enumerate(self.good):
                 if i == 2 or i == 3:
@@ -119,6 +140,12 @@ class PlatformWindow(QMainWindow):
                     plt.show(block=True)
 
     def check_time_differences(self, times, max_difference):
+        """
+        Informs whether time difference between 2 measurements is bigger than max_difference
+        :param times:
+        :param max_difference:
+        :return:
+        """
         # Convert ISO format strings to datetime objects
         datetime_objects = [datetime.fromisoformat(time.replace('Z', '+00:00')) for time in times]
 
