@@ -24,7 +24,7 @@ class ButtonMenuHandler(QWidget):
         self.customButton5 = CustomQPushButton("plot good")
         self.customButton6 = CustomQPushButton("find empty")
 
-        self.customButton7 = CustomQPushButton("7")
+        self.customButton7 = CustomQPushButton("connect timeseries")
         self.customButton8 = CustomQPushButton("8")
         self.customButton9 = CustomQPushButton("show results")
 
