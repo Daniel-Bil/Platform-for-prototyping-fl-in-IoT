@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from logic.wrappers import time_wrapper
+from scipy.signal import savgol_filter
 
 @time_wrapper
 def find_interrupts_withPV(data: dict | pd.DataFrame):
@@ -35,7 +36,6 @@ def find_interrupts_withPV(data: dict | pd.DataFrame):
             good.append(good_course)
             start = idx+1
         return good
-
 
 
 @time_wrapper
@@ -90,7 +90,7 @@ def find_shift_in_timeseries(data1, data2):
     return int(difference_in_minutes / time)
 
 @time_wrapper
-def normalise(data1:dict,data2:dict):
+def normalise(data1:dict, data2:dict):
     for key in ["value_temp","value_hum","value_acid","value_PV"]:
 
         max1 = max([max(data1[key]), max(data2[key])])
@@ -100,6 +100,16 @@ def normalise(data1:dict,data2:dict):
     return data1, data2
 
 
+def filter_savgol(data):
+    smoothed1 = savgol_filter(data['value_temp'], window_length=10, polyorder=2)
+    smoothed2 = savgol_filter(data['value_hum'], window_length=10, polyorder=2)
+    smoothed3 = savgol_filter(data['value_acid'], window_length=10, polyorder=2)
+    smoothed4 = savgol_filter(data['value_PV'], window_length=10, polyorder=2)
+    data['value_temp'] = smoothed1
+    data['value_hum'] = smoothed2
+    data['value_acid'] = smoothed3
+    data['value_PV'] = smoothed4
+    return data
 
 
 

@@ -28,30 +28,38 @@ randomDim = 100
 # Optimizer
 adam = Adam(lr=0.0002, beta_1=0.5)
 
-# Generator
-generator = Sequential()
-generator.add(Dense(256, input_dim=randomDim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
-generator.add(LeakyReLU(0.2))
-generator.add(Dense(512))
-generator.add(LeakyReLU(0.2))
-generator.add(Dense(1024))
-generator.add(LeakyReLU(0.2))
-generator.add(Dense(data_dim, activation='tanh'))  # Output layer now produces 4x1000 vector
-generator.compile(loss='binary_crossentropy', optimizer=adam)
+def create_generator():
+    # Generator
+    generator = Sequential()
+    generator.add(Dense(256, input_dim=randomDim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+    generator.add(LeakyReLU(0.2))
+    generator.add(Dense(512))
+    generator.add(LeakyReLU(0.2))
+    generator.add(Dense(1024))
+    generator.add(LeakyReLU(0.2))
+    generator.add(Dense(data_dim, activation='tanh'))  # Output layer now produces 4x1000 vector
+    generator.compile(loss='binary_crossentropy', optimizer=adam)
+    return generator
 
-# Discriminator
-discriminator = Sequential()
-discriminator.add(Dense(1024, input_dim=data_dim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))  # Input layer adjusted for 4x1000 vector
-discriminator.add(LeakyReLU(0.2))
-discriminator.add(Dropout(0.3))
-discriminator.add(Dense(512))
-discriminator.add(LeakyReLU(0.2))
-discriminator.add(Dropout(0.3))
-discriminator.add(Dense(256))
-discriminator.add(LeakyReLU(0.2))
-discriminator.add(Dropout(0.3))
-discriminator.add(Dense(1, activation='sigmoid'))
-discriminator.compile(loss='binary_crossentropy', optimizer=adam)
+
+def create_discriminator():
+    # Discriminator
+    discriminator = Sequential()
+    discriminator.add(Dense(1024, input_dim=data_dim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))  # Input layer adjusted for 4x1000 vector
+    discriminator.add(LeakyReLU(0.2))
+    discriminator.add(Dropout(0.3))
+    discriminator.add(Dense(512))
+    discriminator.add(LeakyReLU(0.2))
+    discriminator.add(Dropout(0.3))
+    discriminator.add(Dense(256))
+    discriminator.add(LeakyReLU(0.2))
+    discriminator.add(Dropout(0.3))
+    discriminator.add(Dense(1, activation='sigmoid'))
+    discriminator.compile(loss='binary_crossentropy', optimizer=adam)
+    return discriminator
+
+generator = create_generator()
+discriminator = create_discriminator()
 
 # Combined network
 discriminator.trainable = False

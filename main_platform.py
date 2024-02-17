@@ -9,7 +9,7 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
-from logic.data_procesing import find_interrupts_withPV, find_interrupts_withTime, find_shift_in_timeseries, normalise
+from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol
 from logic.wrappers import time_wrapper
 
 plt.style.use('dark_background')
@@ -25,13 +25,14 @@ from GUI.parameters_widget import ParametersHandler
 from keras.applications import ResNet50
 from colorama import Fore
 
+
 class PlatformWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Platform for prototyping federated learning in IoT")
         self.setGeometry(50, 50, 1600, 800)
         self.set_layout()
-        self.setStyleSheet("background-color: #669999;")
+        self.setStyleSheet("background-color: #330033;")
         self.oneFileDict = None
         self.good = None
 
@@ -46,28 +47,15 @@ class PlatformWindow(QMainWindow):
     @time_wrapper
     def read_data(self):
         """
-        Reads data from given file inot pd dataframe and inot dict
+        Reads data from given directory into pd dataframe and then converts to dict
+        for test reasons only 1 file is used
         :return:
         """
-        print("load data")
 
-        files = os.listdir(f"{os.getcwd()}//dane")
-        time, value_temp, value_hum, value_acid, value_PV =[],[],[],[],[]
-        df = pd.read_csv(f'{os.getcwd()}//dane//{files[0]}')
-        print(df)
-        with open(f"{os.getcwd()}//dane//{files[0]}") as file:
-            reader = csv.DictReader(file)
-            for line in reader:
-                time.append(line["time"])
-                value_temp.append(float(line["value_temp"]))
-                value_hum.append(float(line["value_hum"]))
-                value_acid.append(float(line["value_acid"]))
-                value_PV.append(float(line["value_PV"]))
-        self.oneFileDict = {"time": time,
-                            "value_temp": value_temp,
-                            "value_hum": value_hum,
-                            "value_acid": value_acid,
-                            "value_PV": value_PV}
+        file_names = os.listdir(".//dane")
+        self.data = [pd.read_csv(f'.//dane//{file}') for file in file_names]
+        self.oneFileDict = self.data[1].to_dict(orient='list')
+
 
     @time_wrapper
     def plot_data(self):
@@ -177,49 +165,80 @@ class PlatformWindow(QMainWindow):
         plots data *NEEDS FIX*
         :return:
         """
-        fig, axs = plt.subplots(4,2)
+        fig, axs = plt.subplots(4,4)
         fig.suptitle('data shift noticed')
-        plt.legend()
+
         for i in range(len(axs)):
             for j in range(len(axs[i])):
                 axs[i,j].grid(True)
         if self.good is not None:
             for i, good in enumerate(self.good):
 
-                if i == 4:
+                if i == 6:
+
                     t = np.arange(0, len(good["time"]))
                     axs[0,0].plot(t, good["value_temp"], c='b', label="temperature")
                     axs[1,0].plot(t, good["value_hum"], c='g', label="humidity")
                     axs[2,0].plot(t, good["value_acid"], c='y', label="acid")
                     axs[3,0].plot(t, good["value_PV"], c='r', label="PV")
+                    good = filter_savgol(good)
+                    self.good[6] = filter_savgol(good)
+                    axs[0, 2].plot(t, good["value_temp"], c='b', label="temperature")
+                    axs[1, 2].plot(t, good["value_hum"], c='g', label="humidity")
+                    axs[2, 2].plot(t, good["value_acid"], c='y', label="acid")
+                    axs[3, 2].plot(t, good["value_PV"], c='r', label="PV")
 
                     print(good["time"])
-                if i == 5:
+                if i == 7:
                     print(good["time"])
                     t = np.arange(0, len(good["time"]))
                     axs[0, 1].plot(t, good["value_temp"], c='b', label="temperature")
+                    axs[0, 1].legend()
                     axs[1, 1].plot(t, good["value_hum"], c='g', label="humidity")
+                    axs[1, 1].legend()
                     axs[2, 1].plot(t, good["value_acid"], c='y', label="acid")
+                    axs[2, 1].legend()
                     axs[3, 1].plot(t, good["value_PV"], c='r', label="PV")
+                    axs[3, 1].legend()
 
+                    good = filter_savgol(good)
+                    self.good[7] = filter_savgol(good)
+                    axs[0, 3].plot(t, good["value_temp"], c='b', label="temperature")
+                    axs[1, 3].plot(t, good["value_hum"], c='g', label="humidity")
+                    axs[2, 3].plot(t, good["value_acid"], c='y', label="acid")
+                    axs[3, 3].plot(t, good["value_PV"], c='r', label="PV")
             plt.show(block=True)
 
     def connect_timeseries(self):
+        idx1,idx2 = 6, 7
         if self.good is not None:
-            n_missing = find_shift_in_timeseries(self.good[4], self.good[5])
-            connected_length = n_missing + len(self.good[4]) + len(self.good[5])
-            normalised1, normalised2 = normalise(self.good[4], self.good[5])
+            n_missing = find_shift_in_timeseries(self.good[idx1], self.good[idx2])
+            connected_length = n_missing + len(self.good[idx1]) + len(self.good[idx2])
+            normalised1, normalised2 = normalise(self.good[idx1], self.good[idx2])
             # fig, axs = plt.subplots(4, 1)
             # fig.suptitle('data shift fixed')
             # plt.legend()
-            for key in ["value_temp","value_hum","value_acid","value_PV"]:
+            fig, ax = plt.subplots()
+            colors = [["#0000ff", "#00ccff"],
+                      ["#ff00ff", "#660066"],
+                      ["#ff6666", "#cc0000"],
+                      ["#66ff66", "#009933"],
+            ]
+            for idx, key in enumerate(["value_temp","value_hum","value_acid","value_PV"]):
                 data = pd.Series(normalised1[key]+[np.nan for _ in range(n_missing)]+normalised2[key])
                 data = data.interpolate()
+                data.name= key
                 # data.interpolate(method='polynomial', order=2)
 
                 print(data[100])
-                plot = data.plot(title=f"{key}").get_figure()
-                plot.savefig(f'{key}.pdf')
+                print(n_missing)
+                part1 = data[:len(normalised1[key])]
+                part2 = data[len(normalised1[key]):len(normalised1[key])+n_missing]
+                part3 = data[(len(normalised1[key])+n_missing):]
+                part1.plot(ax=ax,title=f"connected 2 timeseries with naive interpolation", legend=True, color =colors[idx][0])
+                part2.plot(ax=ax, color =colors[idx][1])
+                part3.plot(ax=ax, color =colors[idx][0])
+                # plot.savefig(f'{key}.pdf')
 
 
 
