@@ -9,7 +9,7 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
-from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol
+from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, filter_lowess, filter_exponentialsmoothing
 from logic.wrappers import time_wrapper
 
 plt.style.use('dark_background')
@@ -181,8 +181,10 @@ class PlatformWindow(QMainWindow):
                     axs[1,0].plot(t, good["value_hum"], c='g', label="humidity")
                     axs[2,0].plot(t, good["value_acid"], c='y', label="acid")
                     axs[3,0].plot(t, good["value_PV"], c='r', label="PV")
-                    good = filter_savgol(good)
-                    self.good[6] = filter_savgol(good)
+                    # good = filter_savgol(good)
+                    # self.good[6] = filter_savgol(good)
+                    good = filter_lowess(good)
+                    self.good[6] =good
                     axs[0, 2].plot(t, good["value_temp"], c='b', label="temperature")
                     axs[1, 2].plot(t, good["value_hum"], c='g', label="humidity")
                     axs[2, 2].plot(t, good["value_acid"], c='y', label="acid")
@@ -201,8 +203,10 @@ class PlatformWindow(QMainWindow):
                     axs[3, 1].plot(t, good["value_PV"], c='r', label="PV")
                     axs[3, 1].legend()
 
-                    good = filter_savgol(good)
-                    self.good[7] = filter_savgol(good)
+                    # good = filter_savgol(good)
+                    # self.good[7] = filter_savgol(good)
+                    good = filter_lowess(good)
+                    self.good[7] = good
                     axs[0, 3].plot(t, good["value_temp"], c='b', label="temperature")
                     axs[1, 3].plot(t, good["value_hum"], c='g', label="humidity")
                     axs[2, 3].plot(t, good["value_acid"], c='y', label="acid")

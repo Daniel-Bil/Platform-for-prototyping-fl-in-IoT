@@ -132,10 +132,11 @@ def filter_exponentialsmoothing(data):
 
 
 def filter_lowess(data):
-    smoothed1 = lowess(data['value_temp'], range(len(data['value_temp'])), frac=0.1)
-    smoothed2 = lowess(data['value_hum'], range(len(data['value_hum'])), frac=0.1)
-    smoothed3 = lowess(data['value_acid'], range(len(data['value_acid'])), frac=0.1)
-    smoothed4 = lowess(data['value_PV'], range(len(data['value_PV'])), frac=0.1)
+    print()
+    smoothed1 = np.array(lowess(data['value_temp'], range(len(data['value_temp'])), frac=0.1))[:,1]
+    smoothed2 = np.array(lowess(data['value_hum'], range(len(data['value_hum'])), frac=0.1))[:,1]
+    smoothed3 = np.array(lowess(data['value_acid'], range(len(data['value_acid'])), frac=0.1))[:,1]
+    smoothed4 = np.array(lowess(data['value_PV'], range(len(data['value_PV'])), frac=0.1))[:,1]
     data['value_temp'] = smoothed1
     data['value_hum'] = smoothed2
     data['value_acid'] = smoothed3
@@ -190,4 +191,7 @@ def filter_kalman(data):
 if __name__ == "__main__":
     x = {"value_PV": [1,2,3,4,5,56,6,8,7,78],
          "time": [1,2,3,4,5,56,6,8,7,78]}
+
+
+
     # find_interrupts(x)
