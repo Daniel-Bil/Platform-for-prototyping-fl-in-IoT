@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 
 from logic.wrappers import time_wrapper
 from scipy.signal import savgol_filter
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from statsmodels.nonparametric.smoothers_lowess import lowess
+from pykalman import KalmanFilter
 
 @time_wrapper
 def find_interrupts_withPV(data: dict | pd.DataFrame):
@@ -111,6 +114,77 @@ def filter_savgol(data):
     data['value_PV'] = smoothed4
     return data
 
+
+def filter_exponentialsmoothing(data):
+    model1 = ExponentialSmoothing(data['value_temp'], seasonal_periods=12, trend='add', seasonal='add').fit()
+    model2 = ExponentialSmoothing(data['value_hum'], seasonal_periods=12, trend='add', seasonal='add').fit()
+    model3 = ExponentialSmoothing(data['value_acid'], seasonal_periods=12, trend='add', seasonal='add').fit()
+    model4 = ExponentialSmoothing(data['value_PV'], seasonal_periods=12, trend='add', seasonal='add').fit()
+    smoothed1 = model1.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
+    smoothed2 = model2.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
+    smoothed3 = model3.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
+    smoothed4 = model4.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
+    data['value_temp'] = smoothed1
+    data['value_hum'] = smoothed2
+    data['value_acid'] = smoothed3
+    data['value_PV'] = smoothed4
+    return data
+
+
+def filter_lowess(data):
+    smoothed1 = lowess(data['value_temp'], range(len(data['value_temp'])), frac=0.1)
+    smoothed2 = lowess(data['value_hum'], range(len(data['value_hum'])), frac=0.1)
+    smoothed3 = lowess(data['value_acid'], range(len(data['value_acid'])), frac=0.1)
+    smoothed4 = lowess(data['value_PV'], range(len(data['value_PV'])), frac=0.1)
+    data['value_temp'] = smoothed1
+    data['value_hum'] = smoothed2
+    data['value_acid'] = smoothed3
+    data['value_PV'] = smoothed4
+    return data
+
+
+def filter_kalman(data):
+    kf1 = KalmanFilter(transition_matrices=[1],
+                      observation_matrices=[1],
+                      initial_state_mean=data['value_temp'].iloc[0],
+                      initial_state_covariance=1,
+                      observation_covariance=1,
+                      transition_covariance=0.01)
+    kf2 = KalmanFilter(transition_matrices=[1],
+                       observation_matrices=[1],
+                       initial_state_mean=data['value_hum'].iloc[0],
+                       initial_state_covariance=1,
+                       observation_covariance=1,
+                       transition_covariance=0.01)
+    kf3 = KalmanFilter(transition_matrices=[1],
+                       observation_matrices=[1],
+                       initial_state_mean=data['value_acid'].iloc[0],
+                       initial_state_covariance=1,
+                       observation_covariance=1,
+                       transition_covariance=0.01)
+    kf4 = KalmanFilter(transition_matrices=[1],
+                       observation_matrices=[1],
+                       initial_state_mean=data['value_PV'].iloc[0],
+                       initial_state_covariance=1,
+                       observation_covariance=1,
+                       transition_covariance=0.01)
+    state_means1, _ = kf1.filter(data['value_temp'])
+    state_means1 = state_means1.flatten()
+
+    state_means2, _ = kf2.filter(data['value_hum'])
+    state_means2 = state_means2.flatten()
+
+    state_means3, _ = kf3.filter(data['value_acid'])
+    state_means3 = state_means3.flatten()
+
+    state_means4, _ = kf4.filter(data['value_PV'])
+    state_means4 = state_means4.flatten()
+
+    data['value_temp'] = state_means1
+    data['value_hum'] = state_means2
+    data['value_acid'] = state_means3
+    data['value_PV'] = state_means4
+    return data
 
 
 if __name__ == "__main__":
