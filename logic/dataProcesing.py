@@ -9,7 +9,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from pykalman import KalmanFilter
 
 @time_wrapper
-def find_interrupts_withPV(data: dict | pd.DataFrame):
+def find_interrupts_withPV(data: dict | pd.DataFrame) -> dict:
 
 
 
@@ -42,7 +42,7 @@ def find_interrupts_withPV(data: dict | pd.DataFrame):
 
 
 @time_wrapper
-def find_interrupts_withTime(data: dict | pd.DataFrame):
+def find_interrupts_withTime(data: dict | pd.DataFrame) -> dict:
     '''
     Function that finds shift in time series and divides into list of good timeseries
     :param data:
@@ -77,7 +77,7 @@ def find_interrupts_withTime(data: dict | pd.DataFrame):
     return good
 
 @time_wrapper
-def find_shift_in_timeseries(data1, data2):
+def find_shift_in_timeseries(data1, data2) -> int:
     avg1 = []
     for j in range(len(data1["time"]) - 1):
         one = datetime.fromisoformat(data1["time"][j].replace('Z', '+00:00'))
@@ -93,17 +93,31 @@ def find_shift_in_timeseries(data1, data2):
     return int(difference_in_minutes / time)
 
 @time_wrapper
-def normalise(data1:dict, data2:dict):
+def normalise(data1:dict, data2:dict) -> (dict, dict):
     for key in ["value_temp","value_hum","value_acid","value_PV"]:
 
-        max1 = max([max(data1[key]), max(data2[key])])
-        min1 = min([min(data1[key]), min(data2[key])])
+        max1: float = max([max(data1[key]), max(data2[key])])
+        min1: float = min([min(data1[key]), min(data2[key])])
         data1[key] = [(d-min1)/(max1-min1) for d in data1[key]]
         data2[key] = [(d-min1)/(max1-min1) for d in data2[key]]
     return data1, data2
 
 
-def filter_savgol(data):
+def create_basic_data(data: dict):
+    size_of_sample = 20
+    number_of_samples = len(data['value_temp']) - size_of_sample + 1
+    samples = []
+    for i in range(number_of_samples):
+        d1 = data['value_temp'][i:size_of_sample]
+        d2 = data['value_hum'][i:size_of_sample]
+        d3 = data['value_acid'][i:size_of_sample]
+        d4 = data['value_PV'][i:size_of_sample]
+        sample = np.concatenate((d1,d2,d3,d4))
+        samples.append(sample)
+    return np.array(samples)
+
+
+def filter_savgol(data: dict) -> dict:
     smoothed1 = savgol_filter(data['value_temp'], window_length=10, polyorder=2)
     smoothed2 = savgol_filter(data['value_hum'], window_length=10, polyorder=2)
     smoothed3 = savgol_filter(data['value_acid'], window_length=10, polyorder=2)
@@ -115,7 +129,7 @@ def filter_savgol(data):
     return data
 
 
-def filter_exponentialsmoothing(data):
+def filter_exponentialsmoothing(data: dict) -> dict:
     model1 = ExponentialSmoothing(data['value_temp'], seasonal_periods=12, trend='add', seasonal='add').fit()
     model2 = ExponentialSmoothing(data['value_hum'], seasonal_periods=12, trend='add', seasonal='add').fit()
     model3 = ExponentialSmoothing(data['value_acid'], seasonal_periods=12, trend='add', seasonal='add').fit()
@@ -131,8 +145,7 @@ def filter_exponentialsmoothing(data):
     return data
 
 
-def filter_lowess(data):
-    print()
+def filter_lowess(data: dict) -> dict:
     smoothed1 = np.array(lowess(data['value_temp'], range(len(data['value_temp'])), frac=0.1))[:,1]
     smoothed2 = np.array(lowess(data['value_hum'], range(len(data['value_hum'])), frac=0.1))[:,1]
     smoothed3 = np.array(lowess(data['value_acid'], range(len(data['value_acid'])), frac=0.1))[:,1]
@@ -144,7 +157,7 @@ def filter_lowess(data):
     return data
 
 
-def filter_kalman(data):
+def filter_kalman(data: dict) -> dict:
     kf1 = KalmanFilter(transition_matrices=[1],
                       observation_matrices=[1],
                       initial_state_mean=data['value_temp'].iloc[0],
