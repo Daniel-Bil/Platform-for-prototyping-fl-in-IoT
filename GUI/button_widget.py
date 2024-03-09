@@ -28,6 +28,10 @@ class ButtonMenuHandler(QWidget):
         self.customButton8 = CustomQPushButton("8")
         self.customButton9 = CustomQPushButton("show results")
 
+        self.customButton10 = CustomQPushButton("10")
+        self.customButton11 = CustomQPushButton("11")
+        self.customButton12 = CustomQPushButton("12")
+
         self.mainGridLayout.addWidget(self.customButton1, 0, 0)
         self.mainGridLayout.addWidget(self.customButton2, 0, 1)
         self.mainGridLayout.addWidget(self.customButton3, 0, 2)
@@ -39,6 +43,10 @@ class ButtonMenuHandler(QWidget):
         self.mainGridLayout.addWidget(self.customButton7, 2, 0)
         self.mainGridLayout.addWidget(self.customButton8, 2, 1)
         self.mainGridLayout.addWidget(self.customButton9, 2, 2)
+
+        self.mainGridLayout.addWidget(self.customButton10, 3, 0)
+        self.mainGridLayout.addWidget(self.customButton11, 3, 1)
+        self.mainGridLayout.addWidget(self.customButton12, 3, 2)
 
 
 

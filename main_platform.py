@@ -9,7 +9,9 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
-from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, filter_lowess, filter_exponentialsmoothing
+from logic.Outlier_detectors import outlier_detector
+from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, \
+    filter_lowess, filter_exponentialsmoothing, create_basic_data
 from logic.wrappers import time_wrapper
 
 plt.style.use('dark_background')
@@ -35,6 +37,9 @@ class PlatformWindow(QMainWindow):
         self.setStyleSheet("background-color: #330033;")
         self.oneFileDict = None
         self.good = None
+        self.samples = None
+        self.sample_id = 0
+        self.predictions = None
 
     @time_wrapper
     def load_model(self):
@@ -55,7 +60,9 @@ class PlatformWindow(QMainWindow):
         file_names = os.listdir(".//dane")
         self.data = [pd.read_csv(f'.//dane//{file}') for file in file_names]
         self.oneFileDict = self.data[1].to_dict(orient='list')
-
+        self.samples = create_basic_data(self.oneFileDict)
+        self.predictions = outlier_detector(self.samples)
+        print("bre")
 
     @time_wrapper
     def plot_data(self):
@@ -117,7 +124,8 @@ class PlatformWindow(QMainWindow):
             #     # print(end - start)
 
     @time_wrapper
-    def find_empty2(self, data1, data2):
+    def find_empty2(self, data1, data2) -> None:
+
         avg1 = []
         for j in range(len(data1["time"]) - 1):
             print(data1["time"][j])
@@ -267,6 +275,124 @@ class PlatformWindow(QMainWindow):
                 return False  # If any difference is too large, return False
         return True  # If all differences are within the limit, return True
 
+    def outlier_check(self):
+        if self.samples is not None and self.predictions is not None:
+            fig, axs = plt.subplots(4, 2)
+            sample = self.samples[self.sample_id]
+            prediction = self.predictions[self.sample_id]
+
+            fig.suptitle(f'show outliers id:{self.sample_id} outlier?:{"True" if prediction==-1 else "False"}')
+            t = np.arange(0, 20)
+            axs[0, 0].plot(t, sample[:20], c='b', label="temperature")
+            axs[0, 0].legend()
+            axs[1, 0].plot(t, sample[20:40], c='g', label="humidity")
+            axs[1, 0].legend()
+            axs[2, 0].plot(t, sample[40:60], c='y', label="acid")
+            axs[2, 0].legend()
+            axs[3, 0].plot(t, sample[60:], c='r', label="PV")
+            axs[3, 0].legend()
+
+            plt.show(block=True)
+            self.sample_id += 1
+    def better_outlier_check(self):
+
+        if self.samples is not None and self.predictions is not None:
+            spans = []
+            start = 0
+            stop = 20
+            print(len(self.samples) + 20)
+            while(stop < len(self.samples) + 20):
+
+                print(f"start while {start}:{stop}")
+
+
+                print(self.predictions[start])
+                if self.predictions[start]==-1:
+                    for i in range(start,len(self.predictions),1):
+                        if -1 in self.predictions[stop-20:stop]:
+                            stop += 1
+                        else:
+                            span = [start, stop, False]
+                            spans.append(span)
+                            start = stop
+                            stop += 20
+                            break
+                else:
+                    if -1 in self.predictions[stop-20:stop]:
+                        for z, n in enumerate(self.predictions[stop-20:stop]):
+                            if n == -1:
+                                stop = start+z
+                                print("    ", start , stop, z)
+                                span = [start, stop, True]
+                                spans.append(span)
+                                start = stop
+                                stop += 20
+
+                                break
+                    else:
+                        for i in range(start, len(self.predictions), 1):
+                            if -1 in self.predictions[stop - 20:stop]:
+                                span = [start, stop, True]
+                                spans.append(span)
+                                start = stop
+                                stop += 20
+                                break
+                            else:
+                                stop += 1
+
+            fig, axs = plt.subplots(4, 1)
+            colors = [["#00ccff", "#0000ff"],
+                      ["#ff00ff", "#660066"],
+                      ["#ff6666", "#cc0000"],
+                      ["#66ff66", "#009933"]]
+            for k, span in enumerate(spans):
+                if k==0:
+                    print(span[2])
+                t = np.arange(span[0], span[1]+1)
+                if len(spans)-1==k:
+                    axs[0].plot(t, self.oneFileDict["value_temp"][span[0]: 1 + span[1]],
+                                c=colors[0][0] if span[2] else colors[0][1], label="temperature")
+
+                    axs[1].plot(t, self.oneFileDict["value_hum"][span[0]: 1 + span[1]],
+                                c=colors[1][0] if span[2] else colors[1][1], label="humidity")
+
+                    axs[2].plot(t, self.oneFileDict["value_acid"][span[0]: 1 + span[1]],
+                                c=colors[2][0] if span[2] else colors[2][1], label="acid")
+
+                    axs[3].plot(t, self.oneFileDict["value_PV"][span[0]: 1 + span[1]],
+                                c=colors[3][0] if span[2] else colors[3][1], label="PV")
+                else:
+                    axs[0].plot(t, self.oneFileDict["value_temp"][span[0] : 1+span[1]], c=colors[0][0] if span[2] else colors[0][1])
+
+                    axs[1].plot(t, self.oneFileDict["value_hum"][span[0] : 1+span[1]], c=colors[1][0] if span[2] else colors[1][1])
+
+                    axs[2].plot(t, self.oneFileDict["value_acid"][span[0] : 1+span[1]], c=colors[2][0] if span[2] else colors[2][1])
+
+                    axs[3].plot(t, self.oneFileDict["value_PV"][span[0] : 1+span[1]], c=colors[3][0] if span[2] else colors[3][1])
+            z = 0
+
+            for good in self.good:
+                print(len(good["value_temp"]))
+                z+= len(good["value_temp"])
+                axs[0].plot(z,self.oneFileDict["value_temp"][z], c="y" , marker = "o")
+                axs[1].plot(z,self.oneFileDict["value_hum"][z], c="y" , marker = "o")
+                axs[2].plot(z,self.oneFileDict["value_acid"][z], c="y" , marker = "o")
+                axs[3].plot(z,self.oneFileDict["value_PV"][z], c="y" , marker = "o")
+
+
+            axs[0].legend()
+            axs[0].grid(True)
+            axs[1].legend()
+            axs[1].grid(True)
+            axs[2].legend()
+            axs[2].grid(True)
+            axs[3].legend()
+            axs[3].grid(True)
+            plt.show()
+            print("b")
+
+
+
     @time_wrapper
     def set_layout(self):
 
@@ -315,6 +441,8 @@ class PlatformWindow(QMainWindow):
         self.pushButtonMenu.customButton5.clicked.connect(self.plot_data_good2)
         self.pushButtonMenu.customButton6.clicked.connect(self.find_empty)
         self.pushButtonMenu.customButton7.clicked.connect(self.connect_timeseries)
+        self.pushButtonMenu.customButton10.clicked.connect(self.outlier_check)
+        self.pushButtonMenu.customButton11.clicked.connect(self.better_outlier_check)
 
 
 

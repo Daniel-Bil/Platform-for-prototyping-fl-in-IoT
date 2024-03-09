@@ -61,6 +61,7 @@ def find_interrupts_withTime(data: dict | pd.DataFrame) -> dict:
 
     good = []
     for z, idx in enumerate(idxs):
+        idx = idx+1
         time = data['time'][start:idx]
         value_temp = data['value_temp'][start:idx]
         value_hum = data['value_hum'][start:idx]
@@ -73,7 +74,7 @@ def find_interrupts_withTime(data: dict | pd.DataFrame) -> dict:
                        "value_acid": value_acid,
                        "value_PV": value_PV}
         good.append(good_course)
-        start = idx + 1
+        start = idx
     return good
 
 @time_wrapper
@@ -108,12 +109,15 @@ def create_basic_data(data: dict):
     number_of_samples = len(data['value_temp']) - size_of_sample + 1
     samples = []
     for i in range(number_of_samples):
-        d1 = data['value_temp'][i:size_of_sample]
-        d2 = data['value_hum'][i:size_of_sample]
-        d3 = data['value_acid'][i:size_of_sample]
-        d4 = data['value_PV'][i:size_of_sample]
+        idx = i
+        d1 = data['value_temp'][idx : idx+size_of_sample]
+        d2 = data['value_hum'][idx : idx+size_of_sample]
+        d3 = data['value_acid'][idx : idx+size_of_sample]
+        d4 = data['value_PV'][idx : idx+size_of_sample]
         sample = np.concatenate((d1,d2,d3,d4))
         samples.append(sample)
+
+
     return np.array(samples)
 
 
@@ -206,5 +210,13 @@ if __name__ == "__main__":
          "time": [1,2,3,4,5,56,6,8,7,78]}
 
 
+    h = 20
+    c = 10
+    c = h
+    h+= 15
+    print(c,h)
+
+    # d=[1,1,1,-1,-1,1,1,1,1]
+    # print(1 in d[3:4])
 
     # find_interrupts(x)
