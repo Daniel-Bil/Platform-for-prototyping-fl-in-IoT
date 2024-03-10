@@ -1,6 +1,8 @@
 from sklearn.ensemble import IsolationForest
 import numpy as np
-
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.svm import OneClassSVM
+from sklearn.covariance import EllipticEnvelope
 
 def outlier_detector(samples, algorithm = "IsolationForest"):
     if algorithm == "IsolationForest":
@@ -9,9 +11,17 @@ def outlier_detector(samples, algorithm = "IsolationForest"):
         handler.fit(samples)
         predictions = handler.predict(samples)
     elif algorithm == "Local Outlier Factor":
-        pass
+        lof = LocalOutlierFactor(novelty=True)
+        lof.fit(samples)
+        predictions = lof.predict(samples)
+    elif algorithm == "OCSVM":
+        clf = OneClassSVM(gamma='auto').fit(samples)
+        predictions = clf.predict(samples)
+    elif algorithm == "eliptic":
+        cov = EllipticEnvelope(random_state=0).fit(samples)
+        predictions = cov.predict(samples)
     else:
-        pass
+        raise Exception("nuh hu")
 
     return predictions
 

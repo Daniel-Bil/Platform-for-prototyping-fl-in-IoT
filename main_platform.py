@@ -1,4 +1,5 @@
 import time
+from copy import copy
 from datetime import datetime, timedelta
 import os
 
@@ -60,8 +61,9 @@ class PlatformWindow(QMainWindow):
         file_names = os.listdir(".//dane")
         self.data = [pd.read_csv(f'.//dane//{file}') for file in file_names]
         self.oneFileDict = self.data[1].to_dict(orient='list')
-        self.samples = create_basic_data(self.oneFileDict)
-        self.predictions = outlier_detector(self.samples)
+        self.samples = create_basic_data((normalise(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
+        # self.samples = create_basic_data(self.oneFileDict)
+        self.predictions = outlier_detector(self.samples, "eliptic")
         print("bre")
 
     @time_wrapper
@@ -222,7 +224,7 @@ class PlatformWindow(QMainWindow):
             plt.show(block=True)
 
     def connect_timeseries(self):
-        idx1,idx2 = 6, 7
+        idx1, idx2 = 6, 7
         if self.good is not None:
             n_missing = find_shift_in_timeseries(self.good[idx1], self.good[idx2])
             connected_length = n_missing + len(self.good[idx1]) + len(self.good[idx2])
@@ -297,11 +299,12 @@ class PlatformWindow(QMainWindow):
     def better_outlier_check(self):
 
         if self.samples is not None and self.predictions is not None:
+            stretch = 20
             spans = []
             start = 0
-            stop = 20
-            print(len(self.samples) + 20)
-            while(stop < len(self.samples) + 20):
+            stop = stretch
+            print(len(self.samples) + stretch)
+            while(stop < len(self.samples) + stretch):
 
                 print(f"start while {start}:{stop}")
 
@@ -309,33 +312,33 @@ class PlatformWindow(QMainWindow):
                 print(self.predictions[start])
                 if self.predictions[start]==-1:
                     for i in range(start,len(self.predictions),1):
-                        if -1 in self.predictions[stop-20:stop]:
+                        if -1 in self.predictions[stop-stretch:stop]:
                             stop += 1
                         else:
                             span = [start, stop, False]
                             spans.append(span)
                             start = stop
-                            stop += 20
+                            stop += stretch
                             break
                 else:
-                    if -1 in self.predictions[stop-20:stop]:
-                        for z, n in enumerate(self.predictions[stop-20:stop]):
+                    if -1 in self.predictions[stop-stretch:stop]:
+                        for z, n in enumerate(self.predictions[stop-stretch:stop]):
                             if n == -1:
                                 stop = start+z
                                 print("    ", start , stop, z)
                                 span = [start, stop, True]
                                 spans.append(span)
                                 start = stop
-                                stop += 20
+                                stop += stretch
 
                                 break
                     else:
                         for i in range(start, len(self.predictions), 1):
-                            if -1 in self.predictions[stop - 20:stop]:
+                            if -1 in self.predictions[stop - stretch:stop]:
                                 span = [start, stop, True]
                                 spans.append(span)
                                 start = stop
-                                stop += 20
+                                stop += stretch
                                 break
                             else:
                                 stop += 1
