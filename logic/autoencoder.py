@@ -29,3 +29,6 @@ class AutoOutlier():
         threshold = np.quantile(mse, 0.95)
         anomalies = mse > threshold
         return anomalies
+
+if __name__ == "__main__":
+    aut = AutoOutlier()

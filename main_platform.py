@@ -63,7 +63,7 @@ class PlatformWindow(QMainWindow):
         self.oneFileDict = self.data[1].to_dict(orient='list')
         self.samples = create_basic_data((normalise(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
         # self.samples = create_basic_data(self.oneFileDict)
-        self.predictions = outlier_detector(self.samples, "eliptic")
+        self.predictions = outlier_detector(self.samples)
         print("bre")
 
     @time_wrapper
@@ -299,7 +299,7 @@ class PlatformWindow(QMainWindow):
     def better_outlier_check(self):
 
         if self.samples is not None and self.predictions is not None:
-            stretch = 20
+            stretch = 30
             spans = []
             start = 0
             stop = stretch

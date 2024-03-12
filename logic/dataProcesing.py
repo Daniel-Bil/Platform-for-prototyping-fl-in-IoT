@@ -105,7 +105,7 @@ def normalise(data1:dict, data2:dict) -> (dict, dict):
 
 
 def create_basic_data(data: dict):
-    size_of_sample = 20
+    size_of_sample = 30
     number_of_samples = len(data['value_temp']) - size_of_sample + 1
     samples = []
     for i in range(number_of_samples):
