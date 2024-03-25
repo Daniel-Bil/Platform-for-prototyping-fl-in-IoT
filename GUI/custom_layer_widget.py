@@ -53,13 +53,15 @@ class LayerWidget(QWidget):
         elif chosen_layer == "Conv2D":
             self.Conv2DUi()
         elif chosen_layer == "MaxPooling2D":
-            pass
+            self.MaxPooling2DUI()
         elif chosen_layer == "Flatten":
-            pass
+            self.FlattenUI()
         elif chosen_layer == "Dropout":
-            pass
+            self.DropoutUI()
         else:
             pass
+        if not chosen_layer=="None":
+            self.add_end(self.mainLayout)
 
 
     def DenseUI(self):
@@ -78,18 +80,14 @@ class LayerWidget(QWidget):
             vertical.addWidget(label)
             vertical.addWidget(secondwidget)
             self.mainLayout.addLayout(vertical)
-        button2 = QPushButton("specific")
-        self.mainLayout.addWidget(button2)
 
 
     def Conv2DUi(self):
         ll = ["filters", "activ", "kernel_size"]
         for l in ll:
-            print(l)
             vertical = QVBoxLayout()
             vertical.setAlignment(Qt.AlignTop)
             label = QLabel(l)
-            print("1")
             if l == "filters":
                 secondwidget = QLineEdit("0")
             elif l == "activ":
@@ -99,18 +97,69 @@ class LayerWidget(QWidget):
                 secondwidget = QLineEdit("0")
             else:
                 raise Exception("There should be case for that")
-            print("2")
-            try:
-                vertical.addWidget(label)
-                vertical.addWidget(secondwidget)
-            except Exception as e:
-                print(e)
-            print("3")
-            self.mainLayout.addLayout(vertical)
-        button2 = QPushButton("specific")
-        print("4")
-        self.mainLayout.addWidget(button2)
+            vertical.addWidget(label)
+            vertical.addWidget(secondwidget)
 
+            self.mainLayout.addLayout(vertical)
+
+
+    def add_end(self, layout):
+        button2 = QPushButton("specific")
+        button2.setMaximumWidth(50)
+        layout.addWidget(button2)
+        button3 = QPushButton("delete")
+        button3.setMaximumWidth(50)
+        layout.addWidget(button3)
+        button4 = QPushButton(u"insert \u2193")
+        button4.setMaximumWidth(50)
+        layout.addWidget(button4)
+
+        button3.clicked.connect(self.handle_deletion)
+        button4.clicked.connect(self.handle_insert)
+
+    def handle_deletion(self):
+        self.setParent(None)
+        self.deleteLater()
+
+    def handle_insert(self):
+        parentLayout = self.parent().layout()  # Assuming the parent widget is set and has a layout
+        index = parentLayout.indexOf(self)
+        newWidget = LayerWidget()
+        parentLayout.insertWidget(index + 1, newWidget)
+
+    def FlattenUI(self):
+        pass
+
+    def DropoutUI(self):
+        vertical = QVBoxLayout()
+        vertical.setAlignment(Qt.AlignTop)
+        label = QLabel("rate")
+        secondwidget = QLineEdit("0")
+        vertical.addWidget(label)
+        vertical.addWidget(secondwidget)
+
+        self.mainLayout.addLayout(vertical)
+
+
+    def MaxPooling2DUI(self):
+        ll = ["pool_size", "strides", "padding"]
+        for l in ll:
+            vertical = QVBoxLayout()
+            vertical.setAlignment(Qt.AlignTop)
+            label = QLabel(l)
+            if l == "pool_size":
+                secondwidget = QLineEdit("0")
+            elif l == "strides":
+                secondwidget = QLineEdit("0")
+            elif l == "padding":
+                secondwidget = QComboBox()
+                secondwidget.addItems(["valid", "same"])
+            else:
+                raise Exception("There should be case for that")
+            vertical.addWidget(label)
+            vertical.addWidget(secondwidget)
+
+            self.mainLayout.addLayout(vertical)
 
     def clear_layout(self):
         if self.mainLayout is not None:
