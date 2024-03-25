@@ -29,10 +29,14 @@ from keras.applications import ResNet50
 from colorama import Fore
 
 
+
+# a class that defines how a GUI window will be created
 class PlatformWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Platform for prototyping federated learning in IoT")
+        #  50,50 = start position
+        #  1600, 800 = dimensions of the window
         self.setGeometry(50, 50, 1600, 800)
         self.set_layout()
         with open(f"{os.getcwd()}//GUI//stylesheets//background.stylesheet") as file:
@@ -59,9 +63,10 @@ class PlatformWindow(QMainWindow):
         for test reasons only 1 file is used
         :return:
         """
-
+        # take all the names in the directory
         file_names = os.listdir(".//dane")
         self.data = [pd.read_csv(f'.//dane//{file}') for file in file_names]
+        # right now df_RuralloT_002.csv
         self.oneFileDict = self.data[1].to_dict(orient='list')
         self.samples = create_basic_data((normalise(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
         # self.samples = create_basic_data(self.oneFileDict)
