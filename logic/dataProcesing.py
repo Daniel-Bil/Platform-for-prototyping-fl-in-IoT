@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-
+import tensorflow as tf
+import tensorflow_federated as tff
 from logic.wrappers import time_wrapper
 from scipy.signal import savgol_filter
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
@@ -10,8 +11,6 @@ from pykalman import KalmanFilter
 
 @time_wrapper
 def find_interrupts_withPV(data: dict | pd.DataFrame) -> dict:
-
-
 
         number_of_measurements = len(data["time"])
         idxs = []
@@ -104,6 +103,7 @@ def normalise(data1:dict, data2:dict) -> (dict, dict):
     return data1, data2
 
 
+# data is a dictionary of arrays
 def create_basic_data(data: dict):
     size_of_sample = 30
     number_of_samples = len(data['value_temp']) - size_of_sample + 1
@@ -113,10 +113,9 @@ def create_basic_data(data: dict):
         d1 = data['value_temp'][idx : idx+size_of_sample]
         d2 = data['value_hum'][idx : idx+size_of_sample]
         d3 = data['value_acid'][idx : idx+size_of_sample]
-        d4 = data['value_PV'][idx : idx+size_of_sample]
-        sample = np.concatenate((d1,d2,d3,d4))
+        # add them in a manner [temperature, humidity, acidity] (to the sample)
+        sample = np.concatenate((d1,d2,d3))
         samples.append(sample)
-
 
     return np.array(samples)
 
@@ -125,11 +124,11 @@ def filter_savgol(data: dict) -> dict:
     smoothed1 = savgol_filter(data['value_temp'], window_length=10, polyorder=2)
     smoothed2 = savgol_filter(data['value_hum'], window_length=10, polyorder=2)
     smoothed3 = savgol_filter(data['value_acid'], window_length=10, polyorder=2)
-    smoothed4 = savgol_filter(data['value_PV'], window_length=10, polyorder=2)
+    #smoothed4 = savgol_filter(data['value_PV'], window_length=10, polyorder=2)
     data['value_temp'] = smoothed1
     data['value_hum'] = smoothed2
     data['value_acid'] = smoothed3
-    data['value_PV'] = smoothed4
+    #data['value_PV'] = smoothed4
     return data
 
 
@@ -137,15 +136,15 @@ def filter_exponentialsmoothing(data: dict) -> dict:
     model1 = ExponentialSmoothing(data['value_temp'], seasonal_periods=12, trend='add', seasonal='add').fit()
     model2 = ExponentialSmoothing(data['value_hum'], seasonal_periods=12, trend='add', seasonal='add').fit()
     model3 = ExponentialSmoothing(data['value_acid'], seasonal_periods=12, trend='add', seasonal='add').fit()
-    model4 = ExponentialSmoothing(data['value_PV'], seasonal_periods=12, trend='add', seasonal='add').fit()
+    #model4 = ExponentialSmoothing(data['value_PV'], seasonal_periods=12, trend='add', seasonal='add').fit()
     smoothed1 = model1.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
     smoothed2 = model2.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
     smoothed3 = model3.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
-    smoothed4 = model4.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
+    #smoothed4 = model4.predict(start=len(data['value_temp']), end=len(data['value_temp'])+11)
     data['value_temp'] = smoothed1
     data['value_hum'] = smoothed2
     data['value_acid'] = smoothed3
-    data['value_PV'] = smoothed4
+    #data['value_PV'] = smoothed4
     return data
 
 
@@ -220,3 +219,7 @@ if __name__ == "__main__":
     # print(1 in d[3:4])
 
     # find_interrupts(x)
+
+    def preprocessing(samples: np.array):
+
+        return 0
