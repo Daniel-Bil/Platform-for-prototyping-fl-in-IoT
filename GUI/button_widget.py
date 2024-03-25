@@ -25,12 +25,12 @@ class ButtonMenuHandler(QWidget):
         self.customButton6 = CustomQPushButton("find empty")
 
         self.customButton7 = CustomQPushButton("connect timeseries")
-        self.customButton8 = CustomQPushButton("8")
+        self.customButton8 = CustomQPushButton("placeholder")
         self.customButton9 = CustomQPushButton("show results")
 
-        self.customButton10 = CustomQPushButton("10")
-        self.customButton11 = CustomQPushButton("11")
-        self.customButton12 = CustomQPushButton("12")
+        self.customButton10 = CustomQPushButton("single outlier")
+        self.customButton11 = CustomQPushButton("all outliers")
+        self.customButton12 = CustomQPushButton("placeholder")
 
         self.customButton13 = CustomQPushButton("13")
         self.customButton14 = CustomQPushButton("14")
@@ -52,9 +52,9 @@ class ButtonMenuHandler(QWidget):
         self.mainGridLayout.addWidget(self.customButton11, 3, 1)
         self.mainGridLayout.addWidget(self.customButton12, 3, 2)
 
-        self.mainGridLayout.addWidget(self.customButton13, 4, 0)
-        self.mainGridLayout.addWidget(self.customButton14, 4, 1)
-        self.mainGridLayout.addWidget(self.customButton15, 4, 2)
+        # self.mainGridLayout.addWidget(self.customButton13, 4, 0)
+        # self.mainGridLayout.addWidget(self.customButton14, 4, 1)
+        # self.mainGridLayout.addWidget(self.customButton15, 4, 2)
 
 
 

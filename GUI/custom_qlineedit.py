@@ -10,7 +10,7 @@ class CustomLabelEdit(QWidget):
 
         self.label1 = QLabel(text)
         self.label1.setMaximumHeight(50)
-        self.label1.setStyleSheet("background-color: #00ccff;  color:#ffffff; font-size: 20px; font: bold; border-radius: 5px;")
+        self.label1.setStyleSheet("background-color: #518dbf;  color:#ffffff; font-size: 20px; font: bold; border-radius: 5px;")
         self.label1.setAlignment(QtCore.Qt.AlignCenter)
         self.qedit1 = QLineEdit("0")
         self.qedit1.setMaximumWidth(100)

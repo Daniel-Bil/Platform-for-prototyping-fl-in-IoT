@@ -10,6 +10,7 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
+from GUI.custom_architecture_widget import ArchitectureWidget
 from logic.Outlier_detectors import outlier_detector
 from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, \
     filter_lowess, filter_exponentialsmoothing, create_basic_data
@@ -17,8 +18,7 @@ from logic.wrappers import time_wrapper
 
 plt.style.use('dark_background')
 # from tensorflow.keras.applications import ResNet50 <- sprawic by bylo zainstalowane tam sa modele
-from PySide6.QtGui import Qt
-
+from PySide6.QtGui import Qt, QStandardItemModel
 
 from PySide6.QtWidgets import QMainWindow, QHBoxLayout, QVBoxLayout, QWidget, QLabel, QComboBox
 import keras
@@ -35,7 +35,9 @@ class PlatformWindow(QMainWindow):
         self.setWindowTitle("Platform for prototyping federated learning in IoT")
         self.setGeometry(50, 50, 1600, 800)
         self.set_layout()
-        self.setStyleSheet("background-color: #330033;")
+        with open(f"{os.getcwd()}//GUI//stylesheets//background.stylesheet") as file:
+            self.setStyleSheet(file.read())
+        # self.setStyleSheet("background-color: #355C7D;")
         self.oneFileDict = None
         self.good = None
         self.samples = None
@@ -374,13 +376,16 @@ class PlatformWindow(QMainWindow):
                     axs[3].plot(t, self.oneFileDict["value_PV"][span[0] : 1+span[1]], c=colors[3][0] if span[2] else colors[3][1])
             z = 0
 
-            for good in self.good:
-                print(len(good["value_temp"]))
-                z+= len(good["value_temp"])
-                axs[0].plot(z,self.oneFileDict["value_temp"][z], c="y" , marker = "o")
-                axs[1].plot(z,self.oneFileDict["value_hum"][z], c="y" , marker = "o")
-                axs[2].plot(z,self.oneFileDict["value_acid"][z], c="y" , marker = "o")
-                axs[3].plot(z,self.oneFileDict["value_PV"][z], c="y" , marker = "o")
+            for idxx, good in enumerate(self.good):
+                if idxx >= len(self.good)-2:
+                    pass
+                else:
+                    print(len(good["value_temp"]))
+                    z+= len(good["value_temp"])
+                    axs[0].plot(z,self.oneFileDict["value_temp"][z], c="y" , marker = "o")
+                    axs[1].plot(z,self.oneFileDict["value_hum"][z], c="y" , marker = "o")
+                    axs[2].plot(z,self.oneFileDict["value_acid"][z], c="y" , marker = "o")
+                    axs[3].plot(z,self.oneFileDict["value_PV"][z], c="y" , marker = "o")
 
 
             axs[0].legend()
@@ -429,12 +434,16 @@ class PlatformWindow(QMainWindow):
 
         self.label1 = QLabel("models: ")
         self.modelsCombo = QComboBox()
+
+        self.architecture = ArchitectureWidget()
+
         self.modelsCombo.setMinimumHeight(70)
         self.modelsCombo.setMaximumWidth(250)
-        self.modelsCombo.setStyleSheet("background-color: DodgerBlue; font-size: 20px; border-radius 10px; border: 3px solid #0033cc;")
+        self.modelsCombo.setStyleSheet("background-color: #518dbf; font-size: 20px; border-radius 10px; border: 3px solid #0033cc;")
         self.modelsCombo.addItem("Model Test")
         self.modelsCombo.addItem("Model Test2")
         self.horizontalLayout1.addWidget(self.label1)
+        self.horizontalLayout2.addWidget(self.architecture)
         self.horizontalLayout1.addWidget(self.modelsCombo)
 
         self.pushButtonMenu.customButton1.clicked.connect(self.load_model)

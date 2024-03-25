@@ -1,0 +1,7 @@
+
+
+PlatformWindow {
+                   background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #355C7D, stop:1 #525A7D);
+                   color: #ffffff;
+                  }
+
