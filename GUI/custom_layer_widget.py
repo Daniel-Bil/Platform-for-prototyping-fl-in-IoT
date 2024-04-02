@@ -1,7 +1,15 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QComboBox, QVBoxLayout, QLabel, QLineEdit
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QComboBox, QVBoxLayout, QLabel, QLineEdit, QMenu, \
+    QMenuBar
 
+from GUI.specific_parameters_widget import FloatingWidget
 from GUI.utils import clearsubLayout
+
+
+
+
+
 
 common_layers = [
     "None",
@@ -44,6 +52,54 @@ class LayerWidget(QWidget):
         self.combo1.currentTextChanged.connect(self.choose_parameters)
 
 
+    def choose_parameters2(self):
+        print("chose parameters2")
+
+        menubar = QMenuBar()
+        # topMenu1 = menubar.addMenu('Convolutional')
+        # topMenu2 = menubar.addMenu('Core')
+        # topMenu3 = menubar.addMenu('Normalization')
+        # topMenu4 = menubar.addMenu('Preprocessing')
+        # topMenu5 = menubar.addMenu('Regularization')
+        # topMenu6 = menubar.addMenu('Reshaping')
+        # topMenu7 = menubar.addMenu('Pooling')
+        # topMenu8 = menubar.addMenu('RNN')
+
+        # 1
+        ConvolutionalMenu = QMenu('Convolutional', self)
+        menubar.addMenu(ConvolutionalMenu)
+        actions1 = ["Conv1D","Convolution1D",    "Conv1DTranspose",    "Convolution1DTranspose",
+    "Conv2D",    "Convolution2D",    "Conv2DTranspose",    "Convolution2DTranspose",    "Conv3D",    "Convolution3D",    "Conv3DTranspose",    "Convolution3DTranspose",    "DepthwiseConv1D",    "DepthwiseConv2D",    "SeparableConv1D",    "SeparableConvolution1D",    "SeparableConv2D",    "SeparableConvolution2D"
+]
+        for action in actions1:
+            subAction = QAction(action, self)
+            ConvolutionalMenu.addAction(subAction)
+
+        # 2
+        CoreMenu = QMenu('Core', self)
+        menubar.addMenu(CoreMenu)
+        core_layer_names = ["Activation", "Dense", "EinsumDense", "Embedding", "Lambda", "Masking", "ClassMethod", "InstanceMethod", "InstanceProperty", "SlicingOpLambda", "TFOpLambda"]
+
+        for action in core_layer_names:
+            subAction = QAction(action, self)
+            CoreMenu.addAction(subAction)
+
+        # 3
+        NormalizationMenu = QMenu('Normalization', self)
+        menubar.addMenu(NormalizationMenu)
+        preprocessing_layer_names = [
+            "CategoryEncoding", "Discretization", "HashedCrossing", "Hashing",
+            "CenterCrop", "RandomBrightness", "RandomContrast", "RandomCrop", "RandomFlip",
+            "RandomHeight", "RandomRotation", "RandomTranslation", "RandomWidth", "RandomZoom",
+            "Rescaling", "Resizing", "IntegerLookup", "Normalization", "StringLookup",
+            "TextVectorization"
+        ]
+        for action in preprocessing_layer_names:
+            subAction = QAction(action, self)
+            NormalizationMenu.addAction(subAction)
+
+        self.mainLayout.addWidget(menubar)
+
     def choose_parameters(self):
         print("chose parameters")
         chosen_layer = self.combo1.currentText()
@@ -57,6 +113,7 @@ class LayerWidget(QWidget):
         elif chosen_layer == "Flatten":
             self.FlattenUI()
         elif chosen_layer == "Dropout":
+
             self.DropoutUI()
         else:
             pass
@@ -81,6 +138,7 @@ class LayerWidget(QWidget):
             vertical.addWidget(secondwidget)
             self.mainLayout.addLayout(vertical)
 
+        self.choose_parameters2()
 
     def Conv2DUi(self):
         ll = ["filters", "activ", "kernel_size"]
@@ -114,8 +172,14 @@ class LayerWidget(QWidget):
         button4.setMaximumWidth(50)
         layout.addWidget(button4)
 
+        button2.clicked.connect(self.handle_specific)
         button3.clicked.connect(self.handle_deletion)
         button4.clicked.connect(self.handle_insert)
+
+    def handle_specific(self):
+        print("handle specidifn")
+        self.specific = FloatingWidget()
+        self.specific.show()
 
     def handle_deletion(self):
         self.setParent(None)
