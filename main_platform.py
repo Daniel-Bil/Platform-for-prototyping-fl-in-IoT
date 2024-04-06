@@ -11,6 +11,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from GUI.custom_architecture_widget import ArchitectureWidget
+from GUI.generate_data_widget import GenerateDataWidget
 from logic.Outlier_detectors import outlier_detector
 from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, \
     filter_lowess, filter_exponentialsmoothing, create_basic_data
@@ -48,6 +49,9 @@ class PlatformWindow(QMainWindow):
         self.sample_id = 0
         self.predictions = None
 
+
+
+
     @time_wrapper
     def load_model(self):
         """
@@ -72,6 +76,9 @@ class PlatformWindow(QMainWindow):
         # self.samples = create_basic_data(self.oneFileDict)
         self.predictions = outlier_detector(self.samples)
         print("bre")
+        self.test_widget = GenerateDataWidget(self.data)
+        self.test_widget.show()
+
 
     @time_wrapper
     def plot_data(self):
