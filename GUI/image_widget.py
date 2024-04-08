@@ -31,10 +31,9 @@ def qImageToNumpyArray(qimage):
 class ImageWidget(QWidget):
     def __init__(self,parent=None, size = (400, 400)):
         super(ImageWidget, self).__init__(parent)
-        self.setFixedSize(size[0],size[1])
-        # self.setMinimumHeight(size[0])
-        # self.setMinimumWidth(size[1])
-        # self.setMaximumHeight(size[0])
+        self.setMinimumHeight(size[0])
+        self.setMinimumWidth(size[1])
+        self.setMaximumHeight(500)
         # self.setMaximumWidth(size[1])
         self.image = QImage(size[1], size[0], QImage.Format_RGB32)
         gray_color = QColor(128, 128, 128)  # RGB color for gray
@@ -44,7 +43,7 @@ class ImageWidget(QWidget):
     def update_image(self, image):
         self.image = image
         self.update()
-
+        print(self.size())
     def paintEvent(self, event):
 
         painter = QPainter(self)
