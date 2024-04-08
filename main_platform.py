@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 from GUI.custom_architecture_widget import ArchitectureWidget
 from GUI.generate_data_widget import GenerateDataWidget
+from GUI.semisupervised_widget import SemiSupervisedWidget
 from logic.Outlier_detectors import outlier_detector
 from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, \
     filter_lowess, filter_exponentialsmoothing, create_basic_data
@@ -78,6 +79,9 @@ class PlatformWindow(QMainWindow):
         print("bre")
         self.test_widget = GenerateDataWidget(self.data)
         self.test_widget.show()
+
+        self.test_widget2 = SemiSupervisedWidget(self.oneFileDict)
+        self.test_widget2.show()
 
 
     @time_wrapper
