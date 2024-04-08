@@ -14,8 +14,8 @@ class SemiSupervisedWidget(QWidget):
         self.window = 40
         self.data = data["value_temp"]
         self.setMinimumHeight(800)
-        self.setMinimumWidth(1200)
-        self.setMaximumWidth(1200)
+        self.setMinimumWidth(1500)
+        self.setMaximumWidth(1500)
         self.setStyleSheet("background-color: #F67280;")
         self.mainLayout = QVBoxLayout()
         self.mainLayout.setAlignment(Qt.AlignTop)
@@ -84,6 +84,11 @@ class SemiSupervisedWidget(QWidget):
 
         self.ax1 = self.figure1.add_subplot(111)  # Recreate ax1
         self.ax2 = self.figure2.add_subplot(111)  # Recreate ax2
+
+        self.ax1.grid(True)
+        self.ax2.grid(True)
+        self.ax1.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+        self.ax2.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
 
         self.ax1.plot(self.data[0:self.start_idx], color='blue')
         self.ax1.plot(range(self.start_idx,self.end_idx),self.data[self.start_idx:self.end_idx], color='green')
