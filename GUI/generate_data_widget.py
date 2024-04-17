@@ -74,18 +74,15 @@ def naive(trend, seasonals, residuals):
 
 
     while(i < len(trend)):
-        print(i)
         min_step = 100
         seasonal = random.choice(seasonals)
         residual = random.choice(residuals)
         start1 = 100000000
         while(start1>len(seasonal)-min_step):
             start1 = random.randint(0, len(seasonal))
-            print("w1")
         end1=0
         while (end1 < min_step):
             end1 = random.randint(start1, len(seasonal))
-            print("w2")
         diff=end1-start1
         if i+diff > len(trend):
             left = len(trend)-i
@@ -96,11 +93,9 @@ def naive(trend, seasonals, residuals):
         start2 = 100000000
         while (start2 > len(residual) - min_step):
             start2 = random.randint(0, len(residual))
-            print("w3")
         end2 = 0
         while (end2 < min_step):
             end2 = random.randint(start2, len(residual))
-            print("w4")
         diff = end2 - start2
         if i+diff > len(trend):
             left = len(trend)-i
@@ -209,7 +204,7 @@ class GenerateDataWidget(QWidget):
         plt.show()
 
     def get_single_data(self, data, id:int=0):
-        single_IoT_sensor_data = data[id].to_dict(orient='list')
+        single_IoT_sensor_data = data[id].copy().to_dict(orient='list')
         return single_IoT_sensor_data
 
 

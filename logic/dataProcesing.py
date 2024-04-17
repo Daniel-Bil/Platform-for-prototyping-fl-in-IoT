@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import tensorflow as tf
-import tensorflow_federated as tff
+# import tensorflow_federated as tff
 from logic.wrappers import time_wrapper
 from scipy.signal import savgol_filter
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
@@ -41,13 +41,13 @@ def find_interrupts_withPV(data: dict | pd.DataFrame) -> dict:
 
 
 @time_wrapper
-def find_interrupts_withTime(data: dict | pd.DataFrame) -> dict:
+def find_interrupts_withTime(data: dict | pd.DataFrame, idx_only=None):
     '''
     Function that finds shift in time series and divides into list of good timeseries
     :param data:
     :return: list
     '''
-    print()
+    print(data["time"][:20])
     number_of_measurements = len(data["time"])
     idxs = []
     for i in range(number_of_measurements-1):
@@ -55,6 +55,8 @@ def find_interrupts_withTime(data: dict | pd.DataFrame) -> dict:
         two = datetime.fromisoformat(data["time"][i + 1].replace('Z', '+00:00'))
         if int((two - one).total_seconds()) / 60 > 30:
             idxs.append(i)
+    if idx_only is not None:
+        return idxs
     print(idxs)
     start = 0
 

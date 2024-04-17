@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from GUI.custom_architecture_widget import ArchitectureWidget
 from GUI.generate_data_widget import GenerateDataWidget
 from GUI.semisupervised_widget import SemiSupervisedWidget
+from logic.BetterDataClass import BetterDataClass
 from logic.Outlier_detectors import outlier_detector
 from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, \
     filter_lowess, filter_exponentialsmoothing, create_basic_data
@@ -71,16 +72,23 @@ class PlatformWindow(QMainWindow):
         # take all the names in the directory
         file_names = os.listdir(".//dane")
         self.data = [pd.read_csv(f'.//dane//{file}') for file in file_names]
+        self.BetterData = [BetterDataClass(data) for data in self.data]
+        print("brek")
         # right now df_RuralloT_002.csv
         self.oneFileDict = self.data[1].to_dict(orient='list')
+        print("brek")
         self.samples = create_basic_data((normalise(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
         # self.samples = create_basic_data(self.oneFileDict)
         self.predictions = outlier_detector(self.samples)
         print("bre")
-        self.test_widget = GenerateDataWidget(self.data)
-        self.test_widget.show()
+        for data in self.data:
+            print(type(data))
+        # self.test_widget = GenerateDataWidget(self.data)
+        # self.test_widget.show()
+        for data in self.data:
+            print(type(data))
 
-        self.test_widget2 = SemiSupervisedWidget(self.oneFileDict)
+        self.test_widget2 = SemiSupervisedWidget(self.oneFileDict, self.BetterData)
         self.test_widget2.show()
 
 
