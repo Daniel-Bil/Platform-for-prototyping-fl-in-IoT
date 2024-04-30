@@ -2,9 +2,9 @@ from functools import partial
 
 import matplotlib.pyplot as plt
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QImage
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QComboBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QComboBox, QLabel
 from GUI.image_widget import ImageWidget
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -75,14 +75,23 @@ class SemiSupervisedWidget(QWidget):
         self.mainLayout.addLayout(self.horizontalLayout2)
 
         self.qline = QLineEdit("idx")
+        self.qline2 = QLineEdit("0")
         self.horizontalLayout2.addWidget(self.qline)
+
+        self.label = QLabel("label")
+        self.label2 = QLabel("label2")
 
         self.jumpButton = QPushButton("jump")
         self.labelButton = QPushButton("addlabel")
+        self.sampleButton = QPushButton("create\nsamples")
+
+
         self.jumpButton.clicked.connect(self.jump)
         self.labelButton.clicked.connect(self.add_label)
+        self.sampleButton.clicked.connect(self.csamples)
         self.horizontalLayout2.addWidget(self.jumpButton)
         self.horizontalLayout2.addWidget(self.labelButton)
+        self.horizontalLayout2.addWidget(self.sampleButton)
 
         self.combobox = QComboBox()
         self.combobox2 = QComboBox()
@@ -120,15 +129,22 @@ class SemiSupervisedWidget(QWidget):
         self.horizontalLayout2.addWidget(self.button_start)
         self.horizontalLayout2.addWidget(self.button_end)
 
-
+        self.mainLayout.addWidget(self.label)
+        self.mainLayout.addWidget(self.label2)
+        self.mainLayout.addWidget(self.qline2)
 
         self.start_idx = 0
         self.end_idx = self.window
 
         self.start_idx2 = 0
         self.end_idx2 = self.big_window
-
+        self.setMouseTracking(True)
+        self.installEventFilter(self)
         self.update_images()
+
+
+
+
 
     def change_current_data(self):
         idx = self.combobox.currentIndex()
@@ -138,12 +154,16 @@ class SemiSupervisedWidget(QWidget):
 
     def update_images(self):
         print(self.start_idx, self.end_idx)
+        self.label.setText(f"start: {self.start_idx} end: {self.end_idx} middle: {self.end_idx-(self.window//2)}")
 
         for fig in self.figures1:
             fig.clear()
+
         for fig in self.figures2:
             fig.clear()
+
         self.axes = []
+
         for i in range(8):
             if i < 4:
                 ax = self.figures1[i].add_subplot(111)
@@ -151,8 +171,19 @@ class SemiSupervisedWidget(QWidget):
                 ax = self.figures2[i-4].add_subplot(111)
             ax.grid(True)
             ax.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+
             self.axes.append(ax)
         keys = ["value_temp", "value_hum", "value_acid", "value_PV"]
+
+
+
+
+
+
+
+
+
+
         for ax, key in zip(self.axes, keys):
             ax.plot(self.current_data.iot_dict[key][0:self.start_idx], color='blue' if not self.combobox2.currentText()==key else "yellow", rasterized=True)
             ax.plot(range(self.start_idx, self.end_idx), self.current_data.iot_dict[key][self.start_idx:self.end_idx], color='green', rasterized=True)
@@ -198,69 +229,13 @@ class SemiSupervisedWidget(QWidget):
         for canvas in self.canvases2:
             canvas.draw()
 
-
-    # def update_images2(self):
-    #     print(self.start_idx, self.end_idx)
-    #     key = "value_temp"
-    #     self.figure1.clear()
-    #     self.figure2.clear()
-    #     self.figure3.clear()
-    #     self.figure4.clear()
-    #     self.figure5.clear()
-    #     self.figure6.clear()
-    #     self.figure7.clear()
-    #     self.figure8.clear()
-    #
-    #     self.ax1 = self.figure1.add_subplot(111)
-    #     self.ax2 = self.figure2.add_subplot(111)
-    #     self.ax3 = self.figure2.add_subplot(111)
-    #     self.ax4 = self.figure2.add_subplot(111)
-    #     self.ax5 = self.figure2.add_subplot(111)
-    #     self.ax6 = self.figure2.add_subplot(111)
-    #     self.ax7 = self.figure2.add_subplot(111)
-    #     self.ax8 = self.figure2.add_subplot(111)
-    #
-    #     self.ax1.grid(True)
-    #     self.ax2.grid(True)
-    #     self.ax3.grid(True)
-    #     self.ax4.grid(True)
-    #     self.ax5.grid(True)
-    #     self.ax6.grid(True)
-    #     self.ax7.grid(True)
-    #     self.ax8.grid(True)
-    #     self.ax1.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #     self.ax2.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #     self.ax3.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #     self.ax4.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #     self.ax5.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #     self.ax6.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #     self.ax7.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #     self.ax8.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
-    #
-    #     self.ax1.plot(self.current_data.iot_dict[key][0:self.start_idx], color='blue')
-    #     self.ax1.plot(range(self.start_idx,self.end_idx),self.current_data.iot_dict[key][self.start_idx:self.end_idx], color='green')
-    #     self.ax1.plot(range(self.end_idx,len(self.current_data.iot_dict[key])),self.current_data.iot_dict[key][self.end_idx:], color='blue')
-    #
-    #     for index in self.current_data.custom_idxs:
-    #         self.ax1.scatter(index, self.current_data.iot_dict[key][index],c="red")
-    #
-    #     for index in self.current_data.good_idxs:
-    #         self.ax1.scatter(index, self.current_data.iot_dict[key][index],c="yellow")
-    #
-    #     self.ax2.plot(self.current_data.iot_dict[key][self.start_idx:self.end_idx], color='green')
-    #
-    #     for index in self.current_data.custom_idxs:
-    #         if self.start_idx < index < self.end_idx:
-    #             self.ax2.scatter(self.end_idx-index,self.current_data.iot_dict[key][index],c="red")
-    #
-    #     for index in self.current_data.good_idxs:
-    #         if self.start_idx < index < self.end_idx:
-    #             self.ax2.scatter(self.end_idx-index,self.current_data.iot_dict[key][index],c="yellow")
-    #
-    #
-    #     self.canvas1.draw()
-    #     self.canvas2.draw()
-
+    def eventFilter(self, source, event):
+        # Check if the event is a mouse move event
+        if event.type() == QEvent.MouseMove:
+            # Update the label with the new cursor position
+            pos = event.pos()
+            self.label2.setText(f"Cursor Position: {pos.x()}, {pos.y()}")
+        return super().eventFilter(source, event)
 
     def jump(self):
         text = self.qline.text()
@@ -299,4 +274,6 @@ class SemiSupervisedWidget(QWidget):
         self.current_data.errors[text].append(self.start_idx+int(self.window//2))
         self.update_images()
 
-
+    def csamples(self):
+        for data in self.better_data:
+            data.create_samples()

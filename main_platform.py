@@ -72,7 +72,7 @@ class PlatformWindow(QMainWindow):
         # take all the names in the directory
         file_names = os.listdir(".//dane")
         self.data = [pd.read_csv(f'.//dane//{file}') for file in file_names]
-        self.BetterData = [BetterDataClass(data) for data in self.data]
+        self.BetterData = [BetterDataClass(data, file) for data, file in zip(self.data, file_names)]
         print("brek")
         # right now df_RuralloT_002.csv
         self.oneFileDict = self.data[1].to_dict(orient='list')
