@@ -15,7 +15,7 @@ from GUI.generate_data_widget import GenerateDataWidget
 from GUI.semisupervised_widget import SemiSupervisedWidget
 from logic.BetterDataClass import BetterDataClass
 from logic.Outlier_detectors import outlier_detector
-from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalise, filter_savgol, \
+from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalize, filter_savgol, \
     filter_lowess, filter_exponentialsmoothing, create_basic_data
 from logic.wrappers import time_wrapper
 
@@ -70,16 +70,17 @@ class PlatformWindow(QMainWindow):
         :return:
         """
         # take all the names in the directory
-        file_names = os.listdir(".//dane")
-        self.data = [pd.read_csv(f'.//dane//{file}') for file in file_names]
+        file_names = os.listdir("./dane")
+        self.data = [pd.read_csv(f'./dane/{file}') for file in file_names]
         self.BetterData = [BetterDataClass(data, file) for data, file in zip(self.data, file_names)]
         print("brek")
         # right now df_RuralloT_002.csv
         self.oneFileDict = self.data[1].to_dict(orient='list')
         print("brek")
-        self.samples = create_basic_data((normalise(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
+        self.samples = create_basic_data((normalize(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
         # self.samples = create_basic_data(self.oneFileDict)
         self.predictions = outlier_detector(self.samples)
+        print(self.samples)
         print("bre")
         for data in self.data:
             print(type(data))
@@ -254,7 +255,7 @@ class PlatformWindow(QMainWindow):
         if self.good is not None:
             n_missing = find_shift_in_timeseries(self.good[idx1], self.good[idx2])
             connected_length = n_missing + len(self.good[idx1]) + len(self.good[idx2])
-            normalised1, normalised2 = normalise(self.good[idx1], self.good[idx2])
+            normalised1, normalised2 = normalize(self.good[idx1], self.good[idx2])
             # fig, axs = plt.subplots(4, 1)
             # fig.suptitle('data shift fixed')
             # plt.legend()
