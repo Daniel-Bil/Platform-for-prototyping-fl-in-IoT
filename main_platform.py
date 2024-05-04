@@ -17,6 +17,7 @@ from logic.BetterDataClass import BetterDataClass
 from logic.Outlier_detectors import outlier_detector
 from logic.dataProcesing import find_interrupts_withTime, find_shift_in_timeseries, normalize, filter_savgol, \
     filter_lowess, filter_exponentialsmoothing, create_basic_data
+from logic.federated_test import FederatedClass1
 from logic.wrappers import time_wrapper
 
 plt.style.use('dark_background')
@@ -480,7 +481,12 @@ class PlatformWindow(QMainWindow):
         self.pushButtonMenu.customButton7.clicked.connect(self.connect_timeseries)
         self.pushButtonMenu.customButton10.clicked.connect(self.outlier_check)
         self.pushButtonMenu.customButton11.clicked.connect(self.better_outlier_check)
+        self.pushButtonMenu.customButton12.clicked.connect(self.simulated_federated)
 
+
+    def simulated_federated(self):
+        print("Start testing bro...")
+        FederatedClass1(betterdata = self.BetterData)
 
 
 
