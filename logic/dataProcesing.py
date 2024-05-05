@@ -128,10 +128,11 @@ def normalize(data1:dict, data2:dict) -> (dict, dict):
 def denormalize(data:np.array, min_values:dict, max_values:dict) -> (np.array):
 
     denorm_data = np.zeros_like(data)
+
     for i, key in enumerate(['value_temp', 'value_hum', 'value_acid']):
         min_val = min_values[key]
         max_val = max_values[key]
-        denorm_data[:, :, i] = data[:, :, i] * (max_val - min_val) + min_val
+        denorm_data[:, i] = data[:, i] * (max_val - min_val) + min_val
     return denorm_data
 
 
@@ -300,7 +301,7 @@ def hello_world():
 
 
 
-emnist_train, emnist_test = tff.simulation.datasets.emnist.load_data()
+#emnist_train, emnist_test = tff.simulation.datasets.emnist.load_data()
 
 def test_preprocess(dataset):
     def batch_format_fn(element):
@@ -310,24 +311,21 @@ def test_preprocess(dataset):
 
 
 if __name__ == "__main__":
-    # load the preprocessed samples
-    samples = preprocess()
+    # Load the preprocessed samples
+    samples = preprocess()  # This should return a 3D array like `(5631, 30, 3)`
 
-    # configure numpy print options to print arrays fully with two decimal precision
+    # Configure numpy print options for better output visualization
     np.set_printoptions(threshold=np.inf, suppress=True, precision=2)
 
-    # string containing the directory that contains the CSV files
+    # Load CSV files to find min/max values
     data_dir = "/mnt/d/user/PycharmProjects/Platform-for-prototyping-fl-in-IoT/dane"
-    # list all files in the data directory
     file_names = os.listdir(data_dir)
-    # read each file as a pandas DataFrame and store them in a list
     data = [pd.read_csv(os.path.join(data_dir, file)) for file in file_names]
 
     print(file_names[1])
 
-    # right now the file chosen is df_RuralIoT_002.csv
+    # Extract min/max values from the relevant file
     oneFileDict = data[1].to_dict(orient='list')
-
     min_values = {
         'value_temp': min(oneFileDict['value_temp']),
         'value_hum': min(oneFileDict['value_hum']),
@@ -339,29 +337,38 @@ if __name__ == "__main__":
         'value_acid': max(oneFileDict['value_acid'])
     }
 
-    # Print min and max values to verify
     print("Min Values:", min_values)
     print("Max Values:", max_values)
 
-    # print the shape of the samples array to verify dimensions
-    print("Shape of samples:", samples.shape)
+    # Verify the shape of the samples array to confirm data dimensions
+    print("Shape of samples:", samples.shape)  # Expected shape: `(5631, 30, 3)`
 
+    # Define the LSTM model
     model = Sequential([
-        LSTM(50, input_shape=(30, 3), return_sequences=False),
-        Dense(3)
+        LSTM(50, input_shape=(30, 3), return_sequences=False),  # Predict the next single row
+        Dense(3)  # Predicts 3 features (columns)
     ])
 
     model.compile(optimizer="adam", loss="mean_squared_error")
 
-    #target = samples[:, -1, :]
+    # Use the last 30 samples as input
+    x = samples[-30:, :, :]  # Shape: `(30, 30, 3)`
 
-    y = samples[:, :-1, :]  # Get the last step from each sequence as the target
-    X = samples[:, :-1, :]  # The inputs for the model are all but the last step
+    # The target is a single row following the last window
+    y = samples[-1, -1, :].reshape(1, 3)  # Shape: `(1, 3)`
 
-    model.fit(X, y, epochs=20, batch_size=32, validation_split=0.1)
+    # Ensure input and target shapes are printed for debugging
+    print(x.shape)  # Expected: `(30, 30, 3)`
+    print(y.shape)  # Expected: `(1, 3)`
 
+    # Train the model on the last 30 windows with repeated targets
+    model.fit(x, np.tile(y, (30, 1)), epochs=20, batch_size=5, validation_split=0.0)
 
-    predictions = model.predict(samples)
+    # Predict the next row after the last window
+    prediction = model.predict(x[-1].reshape(1, 30, 3))  # Use the last window to predict the next row
 
-    denormalized_predictions = denormalize(predictions, min_values, max_values)
-    print(denormalized_predictions)
+    denormalized_prediction = denormalize(prediction, min_values, max_values)
+
+    # Print the predicted results
+    print("Predicted next value:", prediction)
+    print("Predicted next value (denormalized):", denormalized_prediction)
