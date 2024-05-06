@@ -63,5 +63,3 @@ class BetterDataClass:
                 labels[int(start):int(end)] = 1
 
         self.labels = np.array(labels)
-        print("brek")
-        print()
