@@ -10,8 +10,8 @@ class FederatedClass1:
         self.betterdata = betterdata
 
         self.federated_magic()
-        self.federated_magic_quantized_no_waste(1)
-
+        self.federated_magic_partial(1)
+        self.federated_magic_quantized(2)
 
 
 
@@ -46,7 +46,7 @@ class FederatedClass1:
         print("finished agregating fed avg")
 
 
-    def federated_magic_quantized_no_waste(self, magic_id = 0):
+    def federated_magic_partial(self, magic_id = 0):
         # Create main model *ON THE SERVER*
 
         model = self._create_model()
@@ -75,6 +75,38 @@ class FederatedClass1:
             model.set_weights(avg_weights)
 
         print("finished agregating fed avg + partial")
+
+    def federated_magic_quantized(self, magic_id = 0):
+        #Create main model *ON THE SERVER*
+
+        model = self._create_model()
+        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+
+
+        data = [(bd.samples[:500], bd.labels[:500]) for bd in self.betterdata]
+
+        NUM_CLIENTS = len(self.betterdata) # 7?
+        num_rounds = 20
+
+        for round_num in range(num_rounds):
+            print("Round:", round_num + 1)
+            learned_weights = []
+            for client_id in range(NUM_CLIENTS):
+                weights = self.simple_dequantize_floats(self.teach_model_quantization(data=data[client_id],weights=self.simple_quantize_floats(model.get_weights()), client_id=client_id, round_num = round_num, magic_id = magic_id))
+
+
+                learned_weights.append(weights)
+
+
+            avg_weights = np.mean(learned_weights, axis=0)
+            # avg_weights = self.avg_weights(learned_weights)
+            print("agregated weights!")
+            model.set_weights(avg_weights)
+
+        print("finished agregating fed avg")
+
+
 
 
     def _create_model(self):
@@ -145,7 +177,29 @@ class FederatedClass1:
 
         return c_model.get_weights()
 
+    def teach_model_quantization(self, data, weights, client_id, round_num, magic_id):
+        log_dir = f"logs/{magic_id}/{client_id}"
+        weights = self.simple_dequantize_floats(weights)
 
+        client_writer = tf.summary.create_file_writer(log_dir)
+
+        c_model = self._create_model()
+
+
+        c_model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['accuracy'])
+        c_model.set_weights(weights)
+
+        history = c_model.fit(data[0], data[1], epochs=1, verbose=0)
+
+        loss = history.history['loss'][0]  # Loss for the first (and only) epoch
+        accuracy = history.history['accuracy'][0]
+
+        with client_writer.as_default():
+            tf.summary.scalar("Loss", loss, step=round_num)
+            tf.summary.scalar("Accuracy", accuracy, step=round_num)
+
+
+        return self.simple_quantize_floats(c_model.get_weights())
 
     def avg_weights(self, weights):
         stacked_weights = np.stack(weights, axis=-1)
@@ -154,18 +208,16 @@ class FederatedClass1:
         average_weights = np.mean(stacked_weights, axis=-1)
         return average_weights
 
-    def simple_quantize(self, weights_list):
+    def simple_quantize_floats(self, weights_list: list):
         quantized_weights_list = []
         for weight in weights_list:
-            # Cast float32 weights to int8 directly
-            quantized_weights = weight.astype(np.int8)
+            quantized_weights = weight.astype(np.float16)
             quantized_weights_list.append(quantized_weights)
         return quantized_weights_list
 
-    def simple_dequantize(self, quantized_weights_list):
+    def simple_dequantize_floats(self, quantized_weights_list: list):
         dequantized_weights_list = []
         for quantized_weights in quantized_weights_list:
-            # Cast int8 weights back to float32
             dequantized_weights = quantized_weights.astype(np.float32)
             dequantized_weights_list.append(dequantized_weights)
         return dequantized_weights_list

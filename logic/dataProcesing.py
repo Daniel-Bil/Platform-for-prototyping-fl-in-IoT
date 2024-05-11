@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import tensorflow as tf
-import tensorflow_federated as tff
+# import tensorflow_federated as tff
 from tensorflow.keras.layers import TimeDistributed
 
 from logic.wrappers import time_wrapper
@@ -295,9 +295,9 @@ def preprocess():
     #     print(batch.shape)
 
 # testing code for a machine, if it works, tensorflow works on your machine
-@tff.federated_computation
-def hello_world():
-    return 'Hello, World!'
+# @tff.federated_computation
+# def hello_world():
+#     return 'Hello, World!'
 
 
 
