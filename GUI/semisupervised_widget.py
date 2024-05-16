@@ -11,11 +11,10 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
 
 class SemiSupervisedWidget(QWidget):
-    def __init__(self, data, better_data):
+    def __init__(self, better_data):
         super(SemiSupervisedWidget, self).__init__()
         self.window = 40
         self.big_window = 500
-        self.data = data["value_temp"]
 
         self.better_data = better_data
 

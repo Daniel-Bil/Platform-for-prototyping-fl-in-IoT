@@ -3,17 +3,70 @@ import random
 import keras.callbacks
 import numpy as np
 import tensorflow as tf
+from matplotlib import pyplot as plt
 from tensorflow.keras.optimizers import Adam
 from colorama import Fore
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
+import pandas as pd
+
+
+def create_confusion_matrix(samples, labels, model, epoch, magic_id):
+    y_pred = []  # save predictions
+    y_true = labels  # save ground truth (already a list)
+
+    # Iterate over data
+    for inputs in samples:
+        inputs = np.expand_dims(inputs, axis=0)  # Add batch dimension
+        output = model.predict(inputs)  # Feed Network
+
+        # Get predictions
+        output = np.argmax(output, axis=1)
+        y_pred.extend(output)  # save predictions
+
+    # Constant for classes
+    classes = ['Class 0', 'Class 1']
+
+    # Build confusion matrix
+    cf_matrix = confusion_matrix(y_true, y_pred)
+    df_cm = pd.DataFrame(cf_matrix, index=classes, columns=classes)
+
+    # Plot the confusion matrix
+    plt.figure(figsize=(8, 6))
+    sn.heatmap(df_cm, annot=True, fmt='d', cmap=sn.color_palette("flare", as_cmap=True))
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Confusion Matrix')
+
+    # Save the plot as an image and log to TensorBoard
+    plt.tight_layout()
+    fig = plt.gcf()
+
+    # Convert the plot to a tensor
+    fig.canvas.draw()
+    img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    log_dir = f"logs/{magic_id}/matrix"
+
+
+    client_writer = tf.summary.create_file_writer(log_dir)
+    # Log the image to TensorBoard
+    with client_writer.as_default():
+        tf.summary.image("Confusion Matrix", np.expand_dims(img, axis=0), step=epoch)
+
+    plt.close()
+
+
 class FederatedClass1:
     def __init__(self, betterdata):
         self.betterdata = betterdata
 
-        self.federated_magic(num_rounds=25)
-        self.federated_magic_partial(1,num_rounds=25)
-        self.federated_magic_quantized_float(2,num_rounds=25)
-        self.federated_magic_quantized_int(3,num_rounds=25)
-        self.test_predictions()
+        self.federated_magic(num_rounds=10)
+        self.federated_magic_partial(1,num_rounds=10)
+        self.federated_magic_quantized_float(2,num_rounds=10)
+        self.federated_magic_quantized_int(3,num_rounds=10)
+        # self.test_predictions()
 
 
     def test_predictions(self):
@@ -55,7 +108,10 @@ class FederatedClass1:
         #Create main model *ON THE SERVER*
 
         model = self._create_model()
-        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                                            tf.keras.metrics.Precision(name='precision'),
+                                                                            tf.keras.metrics.Recall(name='recall'),
+                                                                            tf.keras.metrics.AUC(name='auc')])
 
 
 
@@ -81,14 +137,20 @@ class FederatedClass1:
         model.save(f'./models/model_{magic_id}')
         print("finished agregating fed avg")
 
+        create_confusion_matrix(data[2][0],data[2][1],model,1,magic_id=magic_id)
+
+
 
     def federated_magic_partial(self, magic_id = 0, num_rounds =20):
         print(f"{Fore.LIGHTBLUE_EX} federated_magic_partial {Fore.RESET}")
         # Create main model *ON THE SERVER*
 
         model = self._create_model()
-        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
+        model.compile(optimizer='adam', loss='binary_crossentropy',
+                      metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                               tf.keras.metrics.Precision(name='precision'),
+                               tf.keras.metrics.Recall(name='recall'),
+                               tf.keras.metrics.AUC(name='auc')])
         data = [(bd.samples[:1500], bd.labels[:1500]) for bd in self.betterdata]
 
         NUM_CLIENTS = len(self.betterdata)  # 7?
@@ -118,7 +180,11 @@ class FederatedClass1:
         #Create main model *ON THE SERVER*
 
         model = self._create_model()
-        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='binary_crossentropy',
+                      metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                               tf.keras.metrics.Precision(name='precision'),
+                               tf.keras.metrics.Recall(name='recall'),
+                               tf.keras.metrics.AUC(name='auc')])
 
 
 
@@ -150,7 +216,11 @@ class FederatedClass1:
         #Create main model *ON THE SERVER*
 
         model = self._create_model()
-        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        model.compile(optimizer='adam', loss='binary_crossentropy',
+                      metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                               tf.keras.metrics.Precision(name='precision'),
+                               tf.keras.metrics.Recall(name='recall'),
+                               tf.keras.metrics.AUC(name='auc')])
 
 
 
@@ -198,17 +268,26 @@ class FederatedClass1:
         c_model = self._create_model()
 
 
-        c_model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['accuracy'])
+        c_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                                            tf.keras.metrics.Precision(name='precision'),
+                                                                            tf.keras.metrics.Recall(name='recall'),
+                                                                            tf.keras.metrics.AUC(name='auc')])
         c_model.set_weights(weights)
 
         history = c_model.fit(data[0], data[1], epochs=1, verbose=0)
 
         loss = history.history['loss'][0]  # Loss for the first (and only) epoch
         accuracy = history.history['accuracy'][0]
+        precision = history.history['precision'][0]
+        recall = history.history['recall'][0]
+        auc = history.history['auc'][0]
 
         with client_writer.as_default():
             tf.summary.scalar("Loss", loss, step=round_num)
             tf.summary.scalar("Accuracy", accuracy, step=round_num)
+            tf.summary.scalar("Precision", precision, step=round_num)
+            tf.summary.scalar("Recall", recall, step=round_num)
+            tf.summary.scalar("Auc", auc, step=round_num)
 
 
         return c_model.get_weights()
@@ -230,7 +309,10 @@ class FederatedClass1:
 
 
 
-        c_model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['accuracy'])
+        c_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                                            tf.keras.metrics.Precision(name='precision'),
+                                                                            tf.keras.metrics.Recall(name='recall'),
+                                                                            tf.keras.metrics.AUC(name='auc')])
         c_model.set_weights(weights)
 
 
@@ -239,12 +321,19 @@ class FederatedClass1:
             if idx == error_batches-1:
                 break
             features, labels = batch
-            loss, accuracy = c_model.train_on_batch(features,labels)
-
+            results = c_model.train_on_batch(features,labels)
+            loss = results[0]
+            accuracy = results[1]
+            precision = results[2]
+            recall = results[3]
+            auc = results[4]
 
         with client_writer.as_default():
             tf.summary.scalar("Loss", loss, step=round_num)
             tf.summary.scalar("Accuracy", accuracy, step=round_num)
+            tf.summary.scalar("Precision", precision, step=round_num)
+            tf.summary.scalar("Recall", recall, step=round_num)
+            tf.summary.scalar("Auc", auc, step=round_num)
 
 
         return c_model.get_weights()
@@ -258,17 +347,26 @@ class FederatedClass1:
         c_model = self._create_model()
 
 
-        c_model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['accuracy'])
+        c_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                                            tf.keras.metrics.Precision(name='precision'),
+                                                                            tf.keras.metrics.Recall(name='recall'),
+                                                                            tf.keras.metrics.AUC(name='auc')])
         c_model.set_weights(weights)
 
         history = c_model.fit(data[0], data[1], epochs=1, verbose=0)
 
         loss = history.history['loss'][0]  # Loss for the first (and only) epoch
         accuracy = history.history['accuracy'][0]
+        precision = history.history['precision'][0]
+        recall = history.history['recall'][0]
+        auc = history.history['auc'][0]
 
         with client_writer.as_default():
             tf.summary.scalar("Loss", loss, step=round_num)
             tf.summary.scalar("Accuracy", accuracy, step=round_num)
+            tf.summary.scalar("Precision", precision, step=round_num)
+            tf.summary.scalar("Recall", recall, step=round_num)
+            tf.summary.scalar("Auc", auc, step=round_num)
 
 
         return self.simple_quantize_floats(c_model.get_weights())
@@ -283,17 +381,26 @@ class FederatedClass1:
         c_model = self._create_model()
 
 
-        c_model.compile(optimizer="adam", loss='binary_crossentropy', metrics=['accuracy'])
+        c_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                                            tf.keras.metrics.Precision(name='precision'),
+                                                                            tf.keras.metrics.Recall(name='recall'),
+                                                                            tf.keras.metrics.AUC(name='auc')])
         c_model.set_weights(weights)
 
         history = c_model.fit(data[0], data[1], epochs=1, verbose=0)
 
         loss = history.history['loss'][0]  # Loss for the first (and only) epoch
         accuracy = history.history['accuracy'][0]
+        precision = history.history['precision'][0]
+        recall = history.history['recall'][0]
+        auc = history.history['auc'][0]
 
         with client_writer.as_default():
             tf.summary.scalar("Loss", loss, step=round_num)
             tf.summary.scalar("Accuracy", accuracy, step=round_num)
+            tf.summary.scalar("Precision", precision, step=round_num)
+            tf.summary.scalar("Recall", recall, step=round_num)
+            tf.summary.scalar("Auc", auc, step=round_num)
 
 
         return self.quantize_weights_int(c_model.get_weights())

@@ -45,14 +45,11 @@ class PlatformWindow(QMainWindow):
         self.set_layout()
         with open(f"{os.getcwd()}//GUI//stylesheets//background.stylesheet") as file:
             self.setStyleSheet(file.read())
-        # self.setStyleSheet("background-color: #355C7D;")
         self.oneFileDict = None
         self.good = None
         self.samples = None
         self.sample_id = 0
         self.predictions = None
-
-
 
 
     @time_wrapper
@@ -74,24 +71,13 @@ class PlatformWindow(QMainWindow):
         file_names = os.listdir("./dane")
         self.data = [pd.read_csv(f'./dane/{file}') for file in file_names]
         self.BetterData = [BetterDataClass(data, file) for data, file in zip(self.data, file_names)]
-        print("brek")
-        # right now df_RuralloT_002.csv
-        self.oneFileDict = self.data[1].to_dict(orient='list')
-        print("brek")
-        self.samples = create_basic_data((normalize(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
-        # self.samples = create_basic_data(self.oneFileDict)
-        self.predictions = outlier_detector(self.samples)
-        print(self.samples)
-        print("bre")
-        for data in self.data:
-            print(type(data))
-        # self.test_widget = GenerateDataWidget(self.data)
-        # self.test_widget.show()
-        for data in self.data:
-            print(type(data))
 
-        self.test_widget2 = SemiSupervisedWidget(self.oneFileDict, self.BetterData)
-        self.test_widget2.show()
+        # self.oneFileDict = self.data[1].to_dict(orient='list')
+        # self.samples = create_basic_data((normalize(copy(self.oneFileDict), copy(self.oneFileDict)))[0])
+        # self.predictions = outlier_detector(self.samples)
+
+
+
 
 
     @time_wrapper
@@ -475,18 +461,33 @@ class PlatformWindow(QMainWindow):
         self.pushButtonMenu.customButton1.clicked.connect(self.load_model)
         self.pushButtonMenu.customButton2.clicked.connect(self.read_data)
         self.pushButtonMenu.customButton3.clicked.connect(self.plot_data)
+
         self.pushButtonMenu.customButton4.clicked.connect(self.find_good)
         self.pushButtonMenu.customButton5.clicked.connect(self.plot_data_good2)
         self.pushButtonMenu.customButton6.clicked.connect(self.find_empty)
         self.pushButtonMenu.customButton7.clicked.connect(self.connect_timeseries)
-        self.pushButtonMenu.customButton10.clicked.connect(self.outlier_check)
-        self.pushButtonMenu.customButton11.clicked.connect(self.better_outlier_check)
+
+        # self.pushButtonMenu.customButton8.clicked.connect()
+        # self.pushButtonMenu.customButton9.clicked.connect()
+
+        self.pushButtonMenu.customButton10.clicked.connect(self.sample_creation)
+        self.pushButtonMenu.customButton11.clicked.connect(self.data_generation)
         self.pushButtonMenu.customButton12.clicked.connect(self.simulated_federated)
 
-
+    @time_wrapper
     def simulated_federated(self):
         print("Start testing bro...")
         FederatedClass1(betterdata = self.BetterData)
+
+    @time_wrapper
+    def data_generation(self):
+        self.generation_widget = GenerateDataWidget(data=self.BetterData)
+        self.generation_widget.show()
+
+    @time_wrapper
+    def sample_creation(self):
+        self.test_widget2 = SemiSupervisedWidget(self.BetterData)
+        self.test_widget2.show()
 
 
 

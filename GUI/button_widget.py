@@ -28,9 +28,9 @@ class ButtonMenuHandler(QWidget):
         self.customButton8 = CustomQPushButton("placeholder")
         self.customButton9 = CustomQPushButton("show results")
 
-        self.customButton10 = CustomQPushButton("single outlier")
-        self.customButton11 = CustomQPushButton("all outliers")
-        self.customButton12 = CustomQPushButton("placeholder")
+        self.customButton10 = CustomQPushButton("Create\nsamples")
+        self.customButton11 = CustomQPushButton("Generate\nsynthetic")
+        self.customButton12 = CustomQPushButton("Simulate\nfederated")
 
         self.customButton13 = CustomQPushButton("13")
         self.customButton14 = CustomQPushButton("14")
