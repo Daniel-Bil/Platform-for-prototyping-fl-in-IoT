@@ -6,7 +6,7 @@ import os
 class CustomQPushButton(QPushButton):
     def __init__(self, text=""):
         super(CustomQPushButton, self).__init__(text)
-        with open(f"{os.getcwd()}//GUI//custombutton.stylesheet") as file:
+        with open(f"{os.getcwd()}//GUI//stylesheets//custombutton.stylesheet") as file:
             self.setStyleSheet(file.read())
 
         self.setMinimumWidth(150)

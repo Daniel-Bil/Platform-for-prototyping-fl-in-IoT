@@ -1,0 +1,20 @@
+
+
+
+QComboBox {
+                    border: 2px solid gray;
+                    border-radius: 10px; /* Adjust the radius to control the roundness */
+                    padding: 1px 18px 1px 3px;
+                    min-width: 6em;
+                }
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 15px;
+    border-left-width: 1px;
+    border-left-color: darkgray;
+    border-left-style: solid; /* just a single line */
+    border-top-right-radius: 3px; /* same radius as the QComboBox */
+    border-bottom-right-radius: 3px;
+}
