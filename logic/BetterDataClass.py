@@ -52,10 +52,11 @@ class BetterDataClass:
 
         labels = np.zeros(self.length-window)
         keys = ["time", "value_temp", "value_hum", "value_acid", "value_PV"]
+        bias = 2
         for key in keys:
             for error in self.errors[key]:
-                start = error-(window/2-1)
-                end = error+(window/2)
+                start = error-(window/2-bias)
+                end = error+(window/2-bias)
                 if start < 0:
                     start = 0
                 if end >= self.length-window:

@@ -9,12 +9,46 @@ class FederatedClass1:
     def __init__(self, betterdata):
         self.betterdata = betterdata
 
-        self.federated_magic(num_rounds=100)
-        self.federated_magic_partial(1,num_rounds=100)
-        self.federated_magic_quantized_float(2,num_rounds=100)
-        self.federated_magic_quantized_int(3,num_rounds=100)
+        self.federated_magic(num_rounds=25)
+        self.federated_magic_partial(1,num_rounds=25)
+        self.federated_magic_quantized_float(2,num_rounds=25)
+        self.federated_magic_quantized_int(3,num_rounds=25)
+        self.test_predictions()
 
 
+    def test_predictions(self):
+        import matplotlib.pyplot as plt
+        for kk in range(4):
+            loaded_model = tf.keras.models.load_model(f'./models/model_{kk}')
+            data = [(bd.samples[0:2000], bd.labels[0:2000]) for bd in self.betterdata]
+            data = data[0]
+            loss, accuracy = loaded_model.evaluate(data[0], data[1])
+            print(f"Test Loss: {loss}")
+            print(f"Test Accuracy: {accuracy}")
+
+            predictions = loaded_model.predict(data[0])
+
+            x = []
+            y = []
+            y2 = []
+            x2 = []
+            for i in range(len(self.betterdata[0].iot_dict["value_temp"][0:2000])):
+                if data[1][i] == 1:
+                    x.append(i)
+                    y.append(self.betterdata[0].iot_dict["value_temp"][0:2000][i])
+
+            for idx, pred in enumerate(predictions):
+                if pred == 1:
+                    x2.append(idx)
+                    y2.append(self.betterdata[0].iot_dict["value_temp"][0:2000][idx])
+
+            plt.plot(self.betterdata[0].iot_dict["value_temp"][0:2000])
+
+
+
+            plt.scatter(x,y,c="g",alpha=0.5)
+            plt.scatter(x2,y2,c="r",alpha=0.5)
+            plt.show()
 
     def federated_magic(self, magic_id = 0, num_rounds =20):
         print(f"{Fore.LIGHTBLUE_EX} federated_magic {Fore.RESET}")
@@ -25,7 +59,7 @@ class FederatedClass1:
 
 
 
-        data = [(bd.samples[:500], bd.labels[:500]) for bd in self.betterdata]
+        data = [(bd.samples[:1500], bd.labels[:1500]) for bd in self.betterdata]
 
         NUM_CLIENTS = len(self.betterdata) # 7?
 
@@ -44,7 +78,7 @@ class FederatedClass1:
             # avg_weights = self.avg_weights(learned_weights)
             print("agregated weights!")
             model.set_weights(avg_weights)
-
+        model.save(f'./models/model_{magic_id}')
         print("finished agregating fed avg")
 
 
@@ -55,7 +89,7 @@ class FederatedClass1:
         model = self._create_model()
         model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-        data = [(bd.samples[:500], bd.labels[:500]) for bd in self.betterdata]
+        data = [(bd.samples[:1500], bd.labels[:1500]) for bd in self.betterdata]
 
         NUM_CLIENTS = len(self.betterdata)  # 7?
 
@@ -76,7 +110,7 @@ class FederatedClass1:
             # avg_weights = self.avg_weights(learned_weights)
             print("agregated weights!")
             model.set_weights(avg_weights)
-
+        model.save(f'./models/model_{magic_id}')
         print("finished agregating fed avg + partial")
 
     def federated_magic_quantized_float(self, magic_id = 0, num_rounds =20):
@@ -88,7 +122,7 @@ class FederatedClass1:
 
 
 
-        data = [(bd.samples[:500], bd.labels[:500]) for bd in self.betterdata]
+        data = [(bd.samples[:1500], bd.labels[:1500]) for bd in self.betterdata]
 
         NUM_CLIENTS = len(self.betterdata) # 7?
 
@@ -108,7 +142,7 @@ class FederatedClass1:
             # avg_weights = self.avg_weights(learned_weights)
             print("agregated weights!")
             model.set_weights(avg_weights)
-
+        model.save(f'./models/model_{magic_id}')
         print("finished agregating fed avg")
 
     def federated_magic_quantized_int(self, magic_id = 0, num_rounds =20):
@@ -120,7 +154,7 @@ class FederatedClass1:
 
 
 
-        data = [(bd.samples[:500], bd.labels[:500]) for bd in self.betterdata]
+        data = [(bd.samples[:1500], bd.labels[:1500]) for bd in self.betterdata]
 
         NUM_CLIENTS = len(self.betterdata) # 7?
 
@@ -142,14 +176,15 @@ class FederatedClass1:
             # avg_weights = self.avg_weights(learned_weights)
             print("agregated weights!")
             model.set_weights(avg_weights)
-
+        model.save(f'./models/model_{magic_id}')
         print("finished agregating fed avg")
 
 
     def _create_model(self):
         model = tf.keras.Sequential([
             tf.keras.layers.Dense(32, activation='relu', input_shape=(60,)),
-            tf.keras.layers.Dense(16, activation='relu'),
+            tf.keras.layers.Dense(128, activation='relu'),
+            tf.keras.layers.Dense(32, activation='relu'),
             tf.keras.layers.Dense(1, activation='sigmoid')
         ])
         return model
