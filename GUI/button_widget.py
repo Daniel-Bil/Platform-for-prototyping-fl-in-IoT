@@ -26,7 +26,7 @@ class ButtonMenuHandler(QWidget):
 
         self.customButton7 = CustomQPushButton("connect timeseries")
         self.customButton8 = CustomQPushButton("placeholder")
-        self.customButton9 = CustomQPushButton("show results")
+        self.customButton9 = CustomQPushButton("show current\nmodel")
 
         self.customButton10 = CustomQPushButton("Create\nsamples")
         self.customButton11 = CustomQPushButton("Generate\nsynthetic")

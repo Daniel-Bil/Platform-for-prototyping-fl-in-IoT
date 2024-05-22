@@ -127,15 +127,18 @@ class LayerWidget(QWidget):
             vertical = QVBoxLayout()
             vertical.setAlignment(Qt.AlignTop)
             label = QLabel(l)
+            vertical.addWidget(label)
             if l =="units":
-                secondwidget = QLineEdit("0")
+                self.firstwidget = QLineEdit("0")
+                vertical.addWidget(self.firstwidget)
             elif l =="activ":
-                secondwidget = QComboBox()
-                secondwidget.addItems(activation_functions)
+                self.secondwidget = QComboBox()
+                self.secondwidget.addItems(activation_functions)
+                vertical.addWidget(self.secondwidget)
             else:
                 raise Exception("There should be case for that")
-            vertical.addWidget(label)
-            vertical.addWidget(secondwidget)
+
+
             self.mainLayout.addLayout(vertical)
 
         self.choose_parameters2()
@@ -238,3 +241,5 @@ class LayerWidget(QWidget):
                     else:
                         raise Exception("something wrong in deleting layouts")
 
+    def return_values(self):
+        return {"layer_type": self.combo1.currentText(), "units":self.firstwidget.text(), "activation":self.secondwidget.currentText()}

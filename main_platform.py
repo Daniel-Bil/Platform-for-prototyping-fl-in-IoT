@@ -452,8 +452,10 @@ class PlatformWindow(QMainWindow):
         self.modelsCombo.setMinimumHeight(70)
         self.modelsCombo.setMaximumWidth(250)
         self.modelsCombo.setStyleSheet("background-color: #518dbf; font-size: 20px; border-radius 10px; border: 3px solid #0033cc;")
-        self.modelsCombo.addItem("Model Test")
-        self.modelsCombo.addItem("Model Test2")
+        models = os.listdir("./models2")
+        # self.update_combo.connect(self.architecture.new_architecture_signal)
+        self.architecture.new_architecture_signal.connect(self.update_combo)
+        self.modelsCombo.addItems(models)
         self.horizontalLayout1.addWidget(self.label1)
         self.horizontalLayout2.addWidget(self.architecture)
         self.horizontalLayout1.addWidget(self.modelsCombo)
@@ -468,7 +470,7 @@ class PlatformWindow(QMainWindow):
         self.pushButtonMenu.customButton7.clicked.connect(self.connect_timeseries)
 
         # self.pushButtonMenu.customButton8.clicked.connect()
-        # self.pushButtonMenu.customButton9.clicked.connect()
+        self.pushButtonMenu.customButton9.clicked.connect(self.show_model)
 
         self.pushButtonMenu.customButton10.clicked.connect(self.sample_creation)
         self.pushButtonMenu.customButton11.clicked.connect(self.data_generation)
@@ -477,7 +479,7 @@ class PlatformWindow(QMainWindow):
     @time_wrapper
     def simulated_federated(self):
         print("Start testing bro...")
-        FederatedClass1(betterdata = self.BetterData)
+        self.federated_class = FederatedClass1(betterdata = self.BetterData)
 
     @time_wrapper
     def data_generation(self):
@@ -488,6 +490,14 @@ class PlatformWindow(QMainWindow):
     def sample_creation(self):
         self.test_widget2 = SemiSupervisedWidget(self.BetterData)
         self.test_widget2.show()
+
+    def update_combo(self):
+        self.modelsCombo.clear()
+        models = os.listdir('./models2')
+        self.modelsCombo.addItems(models)
+
+    def show_model(self):
+        self.federated_class.recreate_architecture(self.modelsCombo.currentIndex())
 
 
 
