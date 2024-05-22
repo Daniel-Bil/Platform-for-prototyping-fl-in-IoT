@@ -31,7 +31,7 @@ SHUFFLE_BUFFER = 100
 # how many batches prefetched
 PREFETCH_BUFFER = 10
 @time_wrapper
-def find_interrupts_withPV(data: dict | pd.DataFrame) -> dict:
+def find_interrupts_withPV(data: dict) -> dict:
 
         number_of_measurements = len(data["time"])
         idxs = []
@@ -62,7 +62,7 @@ def find_interrupts_withPV(data: dict | pd.DataFrame) -> dict:
 
 
 @time_wrapper
-def find_interrupts_withTime(data: dict | pd.DataFrame, idx_only=None):
+def find_interrupts_withTime(data: dict, idx_only=None):
     '''
     Function that finds shift in time series and divides into list of good timeseries
     :param data:
