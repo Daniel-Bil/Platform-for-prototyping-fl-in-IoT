@@ -1,0 +1,293 @@
+html, body{
+    background-color: #222437;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        repeating-linear-gradient(
+            to right ,
+            transparent 0 50px,
+            rgba(255, 255, 255, 0.1) 50px 52px),
+        repeating-linear-gradient(
+            to bottom,
+            transparent 0 50px,
+            rgba(255, 255, 255, 0.1) 50px 52px
+        );
+        height: 3000px;
+}
+
+.creator{
+    width: 100%;
+    /* height: 3000px; */
+    /* overflow: hidden; */
+    
+        
+}
+
+.context-menu {
+    position: absolute;
+    text-align: center;
+    background: rgb(0, 0, 0);
+    border: 1px solid black;
+    border-radius: 10px;
+    ul{
+        list-style: none;
+        margin: 0;
+        padding: 10px;
+        
+        li{
+            width: 100px;
+            height:30px;
+            font-size: 20px;
+            opacity: .9;
+            color: #ffffff;      
+            cursor: pointer;
+            transition: 50ms;
+            text-decoration: none;
+            white-space: nowrap;
+            &:hover{
+                opacity: 1;
+            }
+            
+            ul{
+                visibility: hidden;
+                opacity: 0;        
+                padding: 0;
+                min-width: 100px;
+                background-color: #333;
+                position: absolute;
+                left: 120px;
+                transform: translateY(-30px);
+                transition: 100ms;
+                transition-delay: 100ms;
+                
+                li {
+                    margin: 0;
+                    padding: 10px 15px;
+                    /* display: flex; */
+                    align-items: center;
+                    justify-content: flex-start;
+                    height: 20px;
+                    
+                    
+                    ul {
+                        visibility: hidden;
+                        opacity: 0;        
+                        padding: 0;
+                        min-width: 100px;
+                        background-color: #333;
+                        position: absolute;
+                        left: 130px;
+                        transform: translateY(-38px);
+                        transition: 100ms;
+                        transition-delay: 100ms;
+                      }
+                      &:hover {
+                        visibility: visible;
+                        background-color: #000000;
+                      }
+                      
+                }
+            }
+            &:hover {
+                > ul {
+                  opacity: 1;
+                  visibility: visible;
+                  transition-delay: 0ms;
+                }
+              }
+        }
+    }
+}
+
+
+.layerType{
+    position: absolute;
+    top: 100px;
+    left: 100px;
+    background-color: #ffffff;
+    width: 300px;
+    height: 100px;
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    justify-content: flex-start;
+
+    border-radius: 10px;
+    padding: 0px;
+    column-gap: 100px;
+    color: white;
+    text-shadow: 1px 1px #000000;
+    > label{
+        border: 1px black;
+        border-radius: 5px;
+        box-shadow: inset 0px 0px 16px 4px rgba(14, 1, 1, 0.4);
+        width: 100%;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        font-size: 40px;
+        &:hover{
+            box-shadow: inset 0px 0px 16px 4px rgba(14, 1, 1, 0.8);
+        }
+    }
+    span{
+        position: absolute;
+        left:calc(100% - 30px);
+        top: 5px;
+        font-size: 25px;
+        border-radius: 5px;
+        padding: 5px;
+        box-shadow: inset 0px 0px 16px 4px rgba(14, 1, 1, 0.4);
+        cursor: pointer;
+    }
+    #activationSelector{
+        width: 100%;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        font-size: 25px;
+        border: solid 1px black;
+        gap: 20px;
+        box-shadow: inset 0px 0px 16px 4px rgba(14, 1, 1, 0.4);
+    }
+    #inputSelector{
+        width: 100%;
+        display: flex;
+        align-content: center;
+        justify-content: center;
+        font-size: 25px;
+        border: solid 1px black;
+        gap: 20px;
+        box-shadow: inset 0px 0px 16px 4px rgba(14, 1, 1, 0.4);
+    }
+    .connector{
+        position: absolute;
+        left:calc(50% - 20px);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        /* background-color: white; */
+        &:hover{
+            background-color: red;
+        }
+    }
+    .inputButton{
+        top:calc(0% - 40px);
+    }
+    .outputButton{
+        top:calc(100%);
+    }
+}
+
+
+.glass{
+    background: linear-gradient(135deg, rgba(240, 240, 236, 0.2), rgba(69, 69, 67, 0.2));
+    backdrop-filter: blur(2px);
+    border-radius: 10px;
+    border: 2px solid rgba(118, 109, 109, 0.2);
+    box-shadow: 0 8px 32px 0 rgba(14, 1, 1, 0.4);
+}
+
+.notChosen{
+    box-shadow: 0 8px 32px 0 rgba(243, 4, 4, 0.7)
+}
+
+.chosen{
+    box-shadow: 0 8px 32px 0 rgba(239, 235, 5, 0.7)
+}
+
+#svgContainer {
+    
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3000px;
+    pointer-events: none;
+    z-index: 999;
+}
+
+line{
+    cursor: pointer;
+}
+
+.informationMenu{
+    width: 500px;
+    height: 80%;
+    top: 50%;
+    left: calc(100%);
+    position: fixed;
+    /* left: 200px; */
+    translate: 0% -50%;
+    >button{
+        position: absolute;
+        height:50%;
+        top:50%;
+        translate: -100% -50%;
+        img{
+            width: 50px;
+            height: 50px;
+            transform: rotate(90deg);
+        }
+    }    
+}
+
+
+.hiddenMenuDataList{
+    display: flex;
+    flex-direction: column;
+}
+
+.hiddenMenuData{
+    display: flex;
+    color: #fff;
+    font-size: 30px;
+    justify-content: left;
+    label{
+        width:50%;
+    }
+    
+}
+
+.tupleInput{
+    width: 30px;
+}
+
+
+.uploadButton{
+    width: 100px;
+    height:100px;
+    position: fixed;
+    top: 50px;
+    left: 50px;
+    transition: 0.5s;
+    color: white;
+    &:hover{
+        background: linear-gradient(135deg, rgba(230, 230, 6, 0.2), rgba(1, 254, 86, 0.2));
+        border-radius: 30px;
+    }
+}
+
+
+.line{
+    pointer-events: all;
+}
+
+
+
+.basicFunctionality{
+    position: fixed;
+    top: 50px;
+    left: 200px;
+    display: flex;
+    color: #fff;
+}
+
+.ArchitecturesCombo{
+    position: fixed;
+    top: 80px;
+    left: 200px;
+    display: flex;
+    color: #000;
+}
