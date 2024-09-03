@@ -107,6 +107,15 @@ def get_architecture_names():
             architecturesList.append({"name":architecture.split(".")[0], "architecture_data":data})
     return flask.Response(response=json.dumps(architecturesList), status=201)
 
+@app.route("/ArchitectureUpdate", methods=['POST'])
+def update_architecture():
+    raise NotImplementedError
+
+@app.route("/ArchitectureDelete", methods=['POST'])
+def delete_architecture():
+    raise NotImplementedError
+
+
 if __name__ == "__main__":
     app.run("localhost", 6969)
 
