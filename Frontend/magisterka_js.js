@@ -15,6 +15,13 @@ const connections = [];
 // Menu on RIGHT click
 // Menu that has names of all layers
 ////////////////////////////////////
+const sendButton = document.getElementById("uploadButton");
+const downloadButton = document.getElementById("downloadButton");
+const deleteButton = document.getElementById("deleteButton");
+const updateButton = document.getElementById("updateButton");
+const testButton = document.getElementById("testButton");
+
+
 
 let curentModel = "Default"
 
@@ -805,7 +812,7 @@ function sendData() {
 
 }
 
-const sendButton = document.getElementById("uploadButton");
+
 sendButton.onclick = sendData;
 
 
@@ -854,7 +861,7 @@ function getNumberOfArchitecturesFromBackend(){
     xhr.send();
 }
 
-const downloadButton = document.getElementById("downloadButton")
+
 downloadButton.onclick = getNumberOfArchitecturesFromBackend
 
 function recreateArchitectureConnections(architecture){
@@ -1007,3 +1014,26 @@ function delLayersXD(){
     console.log(all)
 
 }
+
+function testCallback(){
+    // Check response is ready or not
+    if (xhr.readyState == 4 && xhr.status == 201) {
+        console.log("create 201")
+    }
+    if (xhr.readyState == 4 && xhr.status == 400) {
+        alert("create 400")
+    }
+    if (xhr.readyState == 4 && xhr.status == 500) {
+        alert("create 500")
+    }
+}
+
+function testPostMessage(){
+    console.log("testPostMessage");
+    xhr = getXmlHttpRequestObject();
+    xhr.onreadystatechange = testCallback;
+    xhr.open("POST", "http://localhost:6969/create", true);
+    xhr.send();
+}
+
+testButton.onclick = testPostMessage

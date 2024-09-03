@@ -257,7 +257,7 @@ line{
 
 .uploadButton{
     width: 100px;
-    height:100px;
+    height:50px;
     position: fixed;
 
     transition: 0.5s;
@@ -272,15 +272,19 @@ line{
     left: 50px;
 }
 #downloadButton{
-    top: 170px;
+    top: 110px;
     left: 50px;
 }
 #deleteButton{
-    top: 290px;
+    top: 170px;
     left: 50px;
 }
 #updateButton{
-    top: 410px;
+    top: 230px;
+    left: 50px;
+}
+#testButton{
+    top: 290px;
     left: 50px;
 }
 

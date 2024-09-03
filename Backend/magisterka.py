@@ -6,55 +6,98 @@ import tensorflow as tf
 import tensorflow.keras.layers as Layers
 from tensorflow import keras
 import os
+
 app = Flask(__name__)
 CORS(app)
 
-
-train = [[1,1,1,1,1],
-         [2,2,2,2,2],
-         [3,3,3,3,3],
-         [4,4,4,4,4]]
-
+train = [[1, 1, 1, 1, 1],
+         [2, 2, 2, 2, 2],
+         [3, 3, 3, 3, 3],
+         [4, 4, 4, 4, 4]]
 
 
 def testing_generate_model(model, layer):
     model.add(layer)
     return model
 
+
 def testing_train_model():
     raise Exception(NotImplementedError)
+
 
 def testing_evaluate_model():
     raise Exception(NotImplementedError)
 
-def testing_generate_layer(layerType, i=0):
+
+def testing_generate_layer(layerType):
     """
-    Generate layer from given dictionary 
+    Generate layer from given dictionary
     """
     print(f"{layerType['name']}")
     print(type(layerType))
     kwargs = {}
     for key in list(layerType.keys()):
-        if not (key == "id" or key == "name" or key=="kwargs"): 
+        if not (key == "id" or key == "name" or key == "kwargs"):
             print(key, layerType[key]["default"])
-            if (layerType[key]["type"]=="tuple"):
-                kwargs[key]=tuple([int(l) for l in layerType[key]["default"]])
-            elif(layerType[key]["type"]=="int"):
-                kwargs[key]=int(layerType[key]["default"])
-            elif(layerType[key]["type"]=="float"):
-                kwargs[key]=float(layerType[key]["default"])
+            if (layerType[key]["type"] == "tuple"):
+                kwargs[key] = tuple([int(l) for l in layerType[key]["default"]])
+            elif (layerType[key]["type"] == "int"):
+                kwargs[key] = int(layerType[key]["default"])
+            elif (layerType[key]["type"] == "float"):
+                kwargs[key] = float(layerType[key]["default"])
             else:
-                kwargs[key]=layerType[key]["default"]
-            
+                kwargs[key] = layerType[key]["default"]
+
     layer = getattr(Layers, f"{layerType['name']}")
-    if i==1:
-        layer = layer(**kwargs, input_shape=(10,))
-    else:
-        layer = layer(**kwargs)
-        
+    layer = layer(**kwargs)
+
     return layer
-    
-    
+
+
+def recreate_architecture_from_json(path):
+    with open(path, 'r') as file:
+        data = json.load(file)
+    print(data)
+    layers = []
+    layer = testing_generate_layer(data[0])
+    for i in range(data):
+        if i == 0:
+            continue
+        print(data[i])
+        if not isinstance(data[i], list):
+            if not data[i].name == "Concatenate":
+                layer = testing_generate_layer(data[i])(layer)
+            else:
+                layer = tf.keras.Concatenate()(layers)
+                layers = []
+
+        if isinstance(data[i], list):
+            for j in range(len(data[i])):
+                layers.append(recreate_branch(layer, data[i][j]))
+
+
+def recreate_branch(parent_layer, rest_of_data):
+    if len(rest_of_data) == 0:
+        return parent_layer
+    layers = []
+    layer = parent_layer
+    for z in range(rest_of_data):
+        if not isinstance(rest_of_data[z], list):
+            if not rest_of_data[z].name == "Concatenate":
+                layer = testing_generate_layer(rest_of_data[z])(layer)
+            else:
+                layer = tf.keras.Concatenate()(layers)
+                layers = []
+
+        if isinstance(rest_of_data[z], list):
+            for j in range(len(rest_of_data[z])):
+                layers.append(recreate_branch(layer, rest_of_data[z][j]))
+    return layer
+
+
+@app.route("/create", methods=['POST'])
+def create():
+    raise NotImplementedError
 
 
 @app.route("/Architecture", methods=['GET', 'POST'])
@@ -69,8 +112,39 @@ def get_architecture():
         print()
         print(received_data)
 
-        with open(f"Backend\\architectureJsons\\{received_data['name']}.json", "w") as file:
+        with open(f"architectureJsons\\{received_data['name']}.json", "w") as file:
             json.dump(received_data["architecture"], file, indent=4)
+        from tensorflow.keras import layers, Model
+
+        # input_shape = 10  # Replace with your input shape
+        # input_layer = layers.Input(shape=(input_shape,))
+
+        # # Define parent layer
+        # parent_layer = layers.Dense(64, activation='relu')(input_layer)
+
+        # # Left branch with 3 layers
+        # left_branch = layers.Dense(32, activation='relu')(parent_layer)
+        # left_branch = layers.Dense(32, activation='relu')(left_branch)
+        # left_branch = layers.Dense(32, activation='relu')(left_branch)
+
+        # # Right branch with 2 layers
+        # right_branch = layers.Dense(32, activation='relu')(parent_layer)
+        # right_branch = layers.Dense(32, activation='relu')(right_branch)
+
+        # # Merge branches
+        # merged = layers.Concatenate()([left_branch, right_branch])
+
+        # # Final output layer
+        # output_layer = layers.Dense(1, activation='sigmoid')(merged)
+
+        # # Create the model
+        # model = Model(inputs=input_layer, outputs=output_layer)
+
+        # # Compile the model
+        # model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+        # # Print the model summary
+        # model.summary()
 
         # testing_generate_layer(received_data[1])
 
@@ -79,14 +153,10 @@ def get_architecture():
         #     if not i==0:
         #         model = testing_generate_model(model, testing_generate_layer(received_data[i],i))
         # model.summary()
-        # model.compile(optimizer='adam', 
+        # model.compile(optimizer='adam',
         #       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         #       metrics=[keras.metrics.SparseCategoricalAccuracy()])
         # model.summary()
-        
-
-        
-
 
         return_data = {
             "status": "success",
@@ -98,18 +168,20 @@ def get_architecture():
 @app.route("/ArchitecturesNames", methods=['GET'])
 def get_architecture_names():
     print("GET ArchitectureNames")
-    architectures = os.listdir(f"{os.getcwd()}\\Backend\\architectureJsons")
+    architectures = os.listdir(f"{os.getcwd()}\\architectureJsons")
     print(architectures)
     architecturesList = []
     for architecture in architectures:
-        with open(f"Backend\\architectureJsons\\{architecture}", 'r') as file:
+        with open(f"architectureJsons\\{architecture}", 'r') as file:
             data = json.load(file)
-            architecturesList.append({"name":architecture.split(".")[0], "architecture_data":data})
+            architecturesList.append({"name": architecture.split(".")[0], "architecture_data": data})
     return flask.Response(response=json.dumps(architecturesList), status=201)
+
 
 @app.route("/ArchitectureUpdate", methods=['POST'])
 def update_architecture():
     raise NotImplementedError
+
 
 @app.route("/ArchitectureDelete", methods=['POST'])
 def delete_architecture():
@@ -119,4 +191,3 @@ def delete_architecture():
 if __name__ == "__main__":
     app.run("localhost", 6969)
 
-   
