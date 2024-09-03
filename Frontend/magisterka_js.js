@@ -16,7 +16,9 @@ const connections = [];
 // Menu that has names of all layers
 ////////////////////////////////////
 
-const architectureNameInput = document.getElementsByClassName("ArchitectureNameInput")[0] 
+let curentModel = "Default"
+
+const architectureNameInput = document.getElementsByClassName("ArchitectureNameInput")[0]
 const architectureNameCombo = document.getElementsByClassName("ArchitecturesCombo")[0]
 ///////////////////////////////////
 document.onclick = hideMenu;
@@ -35,10 +37,10 @@ function rightClick(e) {
         hideMenu();
     else {
         let menu = document.getElementById("contextMenu")
-            
+
         console.log(e.pageX);
-        console.log(e.pageY);   
-        
+        console.log(e.pageY);
+
         menu.style.left = e.pageX + "px";
         menu.style.top = e.pageY + "px";
         menu.style.display = 'block';
@@ -56,12 +58,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check if the clicked element is an <li>
         var target = event.target;
         if (target.tagName === 'LI' && target.childNodes.length<2) {
-            
+
             // Get the text content of the clicked <li> element
             var textContent = target.textContent.trim();
             console.log('Clicked text content:', textContent);
             // Perform any action with the textContent
-            
+
             const elemntId = 'element-' + Date.now()
 
             let newLayer = createLayer(event, elemntId, textContent)
@@ -82,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function createLineElement(x1, y1, x2, y2) {
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    
+
     line.setAttribute("x1", x1);
     line.setAttribute("y1", y1);
     line.setAttribute("x2", x2);
@@ -92,7 +94,7 @@ function createLineElement(x1, y1, x2, y2) {
     line.setAttribute("stroke-width", "10");
     line.setAttribute("style", "cursor: pointer;");
     line.setAttribute("style", "z-index: 999;");
-    
+
     svgContainer.appendChild(line);
     return line;
 }
@@ -112,6 +114,19 @@ function startLine(event, button) {
     currentLine = createLineElement(startX, startY, startX, startY);
     currentLine.setAttribute("id", button.parentElement.id)
     updateLine(event);
+}
+
+function reconstructStartLine(button) {
+
+    console.log("reconstructStartLine")
+    console.log(button)
+    const rect = button.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const startY = rect.top + rect.height / 2;
+
+    let reconstructedLine = createLineElement(startX, startY, startX, startY);
+    reconstructedLine.setAttribute("id", button.parentElement.id)
+    return reconstructedLine
 }
 
 function updateLine(event) {
@@ -142,7 +157,7 @@ function stopLine(event) {
         // if (index !== -1) {
         //     svgContainer.splice(index, 1); // Remove the object from the array
         // }
-        
+
         isDrawing = false;
         currentLine = null;
         startButton = null;
@@ -168,7 +183,7 @@ function finishLine(event, button) {
                 const rect = button.getBoundingClientRect();
                 const endX = rect.left + rect.width / 2 + window.scrollX;;
                 const endY = rect.top + rect.height / 2 + window.scrollY;;
-            
+
                 currentLine.setAttribute("x2", endX);
                 currentLine.setAttribute("y2", endY);
             }
@@ -185,21 +200,62 @@ function finishLine(event, button) {
                 currentLine.setAttribute("x2", newx2);
                 currentLine.setAttribute("y2", newy2);
             }
-            
+
             console.log("connections = ",connections)
-            
+
             currentLine.setAttribute("class", "line");
             currentLine.addEventListener("click", (e)=>{
                 delLine(e)
             })
-            
+
             isDrawing = false;
             currentLine = null;
             startButton = null;
         }
-        
+
     }
 }
+
+function reconstructFinishLine(startButton, endButton, reconstructedLine) {
+
+        if (!(endButton===startButton) && !(endButton.parentElement.id===startButton.parentElement.id) && !(endButton.classList.contains(startButton.classList[0]))) {
+
+            // connection.endButton = button;
+            // Finalize line position with the end button
+            if(endButton.classList.contains("inputButton"))
+            {
+                connections.push({start: startButton.parentElement.id, end: endButton.parentElement.id, line: reconstructedLine, startButton:startButton,endButton:endButton})
+                const rect = endButton.getBoundingClientRect();
+                const endX = rect.left + rect.width / 2 + window.scrollX;;
+                const endY = rect.top + rect.height / 2 + window.scrollY;;
+
+                reconstructedLine.setAttribute("x2", endX);
+                reconstructedLine.setAttribute("y2", endY);
+            }
+            else{
+                reconstructedLine.setAttribute("id", button.parentElement.id)
+                connections.push({start: endButton.parentElement.id, end: startButton.parentElement.id, line: reconstructedLine, startButton:endButton,endButton:startButton})
+                const rect = endButton.getBoundingClientRect();
+                const endX = rect.left + rect.width / 2 + window.scrollX;;
+                const endY = rect.top + rect.height / 2 + window.scrollY;;
+                let newx2 = reconstructedLine.getAttribute("x1"), newy2 = reconstructedLine.getAttribute("y1")
+                reconstructedLine.setAttribute("x1", endX);
+                reconstructedLine.setAttribute("y1", endY);
+
+                reconstructedLine.setAttribute("x2", newx2);
+                reconstructedLine.setAttribute("y2", newy2);
+            }
+
+            console.log("connections = ",connections)
+
+            reconstructedLine.setAttribute("class", "line");
+            reconstructedLine.addEventListener("click", (e)=>{
+                delLine(e)
+            })
+        }
+
+}
+
 
 document.addEventListener('mousemove', (e) => {
     if (isDrawing && currentLine) {
@@ -219,13 +275,48 @@ function createLayer(event, id, layerName){
     <button class="inputButton connector glass"></button>
     <label class="layerName">${layerName}</label>
     <span class="close">X</span>
-    
+
     <button class="outputButton connector glass"></button>
     `
-    
+
     newLayer.style.left = `${event.pageX-50}px`;
     newLayer.style.top = `${event.pageY-50}px`;
     return newLayer
+}
+
+function reconstructLayer(id, layerName, place){
+    let newLayer = document.createElement('div');
+    newLayer.id = id
+    newLayer.classList.add('layerType');
+    newLayer.classList.add('glass');
+    newLayer.classList.add('notChosen');
+    newLayer.innerHTML = `
+    <button class="inputButton connector glass"></button>
+    <label class="layerName">${layerName}</label>
+    <span class="close">X</span>
+
+    <button class="outputButton connector glass"></button>
+    `
+
+    newLayer.style.left = `${place.x}px`;
+    newLayer.style.top = `${place.y}px`;
+    return newLayer
+}
+
+function reconstructMoreThanLayer(existingLayerInfo, x, y){
+    console.log(existingLayerInfo)
+    let newLayer = reconstructLayer(existingLayerInfo.id, existingLayerInfo.name, {x:x, y:y})
+
+    document.getElementById("list").appendChild(newLayer);
+    newLayer.addEventListener('mousedown', mouseDownLayer)
+
+    elementsData.push(existingLayerInfo)
+    console.log(elementsData)
+    let buttons = newLayer.querySelectorAll('.connector');
+    buttons.forEach(button =>{
+        button.addEventListener('mousedown', (event) => startLine(event, button));
+        button.addEventListener('click', (event) => finishLine(event, button)); // Finish line on button click
+    })
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -235,10 +326,10 @@ let newX = 0, newY = 0, startX =0, startY =0;
 function mouseDownLayer(e){
     startX = e.pageX
     startY = e.pageY
-    
+
     document.addEventListener('mousemove', mouseMoveLayer)
     document.addEventListener('mouseup', mouseUpLayer)
-    
+
 
     let layers = document.getElementsByClassName("layerType")
     for (let i = 0; i < layers.length; i++) {
@@ -278,10 +369,10 @@ function mouseDownLayer(e){
                         let newEl = generateTuple(e.target.id, `${key}`,elementsData[index][key].type ,elementsData[index][key])
                         document.getElementsByClassName("hiddenMenuDataList")[0].appendChild(newEl)
                     }
-                    
-                    
+
+
                 }
-                
+
             }
         }
     }
@@ -307,7 +398,7 @@ function mouseUpLayer(e){
 
 function delLine(event){
     const index = connections.findIndex(data => data.line.id === event.target.id);
-    
+
     if (index !== -1) {
         svgContainer.removeChild(event.target)
         connections.splice(index, 1); // Remove the object from the array
@@ -317,19 +408,6 @@ function delLine(event){
 
 function delLine2(id){
     console.log("delLine2")
-    // const indexStart = connections.findIndex(data => data.start === id);
-    
-    
-    // if (indexStart !== -1) {
-    //     svgContainer.removeChild(connections[indexStart].line)
-    //     connections.splice(indexStart, 1); // Remove the object from the array
-    // }
-    // const indexEnd = connections.findIndex(data => data.end === id);
-    // if (indexEnd !== -1) {
-    //     svgContainer.removeChild(connections[indexEnd].line)
-    //     connections.splice(indexEnd, 1); // Remove the object from the array
-    // }
-
     for(let i =connections.length-1; i>=0;i--){
         if(connections[i].start==id){
             svgContainer.removeChild(connections[i].line)
@@ -356,7 +434,7 @@ function updateLinePosition(event){
             const rect = connections[startIndex].startButton.getBoundingClientRect();
             const endX = rect.left + rect.width / 2 + window.scrollX;
             const endY = rect.top + rect.height / 2 + window.scrollY;
-            
+
             for(let i =0; i<connections.length;i++){
                 if(connections[i].start==event.target.id){
                     const line = connections[i].line
@@ -364,7 +442,7 @@ function updateLinePosition(event){
                     line.setAttribute("y1", endY);
                 }
             }
-            
+
         }
 
         if (endIndex !==-1){
@@ -396,7 +474,7 @@ document.addEventListener('click', (event) =>{
         if (index !== -1) {
             elementsData.splice(index, 1); // Remove the object from the array
         }
-        
+
     }
 })
 /////////////////////////////////////////// tuple buttons
@@ -424,7 +502,7 @@ function deleteTuple(event, id, labelName){
     updateStructTuple(event, id, labelName)
 }
 
-/////////////////////////////////////////// UPDATE           Structs on hidden menu 
+/////////////////////////////////////////// UPDATE           Structs on hidden menu
 function updateStructString(event, id, labelName) {
     const index = elementsData.findIndex(data => data.id === id);
         for (const key in elementsData[index]) {
@@ -437,7 +515,7 @@ function updateStructString(event, id, labelName) {
                     console.log(elementsData)
                     console.log(event.target.value)
                 }
-                
+
             }
         }
 }
@@ -450,7 +528,7 @@ function updateStructTuple(event, id, labelName) {
                     console.log("updateStructTuple")
                     let parent = event.target.parentElement;
                     let childInputs = parent.querySelectorAll('input');
-                    
+
                     const valuesList = [];
                     console.log(valuesList)
                     childInputs.forEach(input => {
@@ -461,7 +539,7 @@ function updateStructTuple(event, id, labelName) {
 
                     console.log(elementsData)
                 }
-                
+
             }
         }
 }
@@ -472,16 +550,16 @@ function updateStructNumber(event, id, labelName){
             if (elementsData[index].hasOwnProperty(key)) {
                 if (key==labelName){
                     console.log("updateStructNumber")
-                    
+
                     elementsData[index][key].default = event.target.value
                     console.log(elementsData)
-                    
+
                 }
-                
+
             }
         }
 }
-/////////////////////////////////////// GENERATE 
+/////////////////////////////////////// GENERATE
 function generateKwargs(elementId, label, type, restOfValues){
 
 }
@@ -504,16 +582,16 @@ function generateTuple(elementId, label, type, restOfValues){
     dataDiv.classList.add('hiddenMenuData');
 
     dataDiv.innerHTML = `<label>${label}</label>`
-        
+
     dataDiv.appendChild(customButton1)
 
     customButton1.addEventListener("click", function(event) {
         deleteTuple(event, elementId, label)
-    })   
+    })
 
     customButton2.addEventListener("click", function(event) {
         addTuple(event, elementId, label)
-    })   
+    })
 
     console.log("len = ",restOfValues.default.length)
     for(let i=0; i<restOfValues.default.length; i++){
@@ -523,10 +601,10 @@ function generateTuple(elementId, label, type, restOfValues){
         customInput.value = restOfValues.default[i]
         customInput.addEventListener("change", function(event) {
             updateStructTuple(event, elementId, label)
-        })   
+        })
         dataDiv.appendChild(customInput)
     }
-    
+
     dataDiv.appendChild(customButton2)
     return dataDiv
 }
@@ -541,7 +619,7 @@ function generateSelect(elementId, label, type, restOfValues){
             <label>${label}</label>
             `
     for (let i=0; i< restOfValues.values.length;i++)
-    {   
+    {
         let customOption = document.createElement("option");
         customOption.text = restOfValues.values[i];
         customOption.value = restOfValues.values[i];
@@ -551,18 +629,18 @@ function generateSelect(elementId, label, type, restOfValues){
             console.log(restOfValues.default)
             console.log(restOfValues.values[i]==restOfValues.default)
         }
-        
+
         if (restOfValues.values[i]==restOfValues.default){
             customOption.selected = true;
         }
 
         customSelect.appendChild(customOption)
     }
-    dataDiv.appendChild(customSelect) 
+    dataDiv.appendChild(customSelect)
 
     customSelect.addEventListener("change", function(event) {
         updateStructString(event, elementId, label)
-    })   
+    })
 
     return dataDiv
 }
@@ -571,7 +649,7 @@ function generateInput(elementId, label, type, restOfValues){
     let dataDiv = document.createElement('div');
     dataDiv.classList.add('hiddenMenuData');
 
-    
+
     dataDiv.innerHTML = `
             <label>${label}</label>
             `
@@ -587,17 +665,17 @@ function generateInput(elementId, label, type, restOfValues){
     else{
         input.placeholder = restOfValues.default
     }
-    
+
     dataDiv.appendChild(input)
 
     input.addEventListener("change", function(event) {
         updateStructNumber(event, elementId, label)
-    })   
+    })
     return dataDiv
 }
 
 function generateSomething(elementId, label, type, restOfValues){
-    
+
 }
 
 
@@ -635,42 +713,42 @@ hiddenButton.onclick = function(){
 
 
 
-function createJSONArchitecture(){
-    //     
-    // 
-    //     
-    console.log("createJSONArchitecture")
-    let MainJSON = []
-    let MainData = {Architecture: "Sequential"}
-    MainJSON.push(MainData)
-    let layers = document.querySelectorAll(".layerType")
-    if(layers.length>0){
-        for (let layer of layers){
-            const index = elementsData.findIndex(data => data.id === layer.id);
-            // for (const key in elementsData[index]) {
-            //     if (elementsData[index].hasOwnProperty(key)) {
-            //         if (!(key=="id") && !(key=="name") && !(key=="kwargs")){
-            //             console.log(`${key}`)
-                        
-                        
-                        
-            //         }
-                    
-            //     }
-                
-            // }
-            MainJSON.push(elementsData[index])
+// function createJSONArchitecture(){
+//     //
+//     //
+//     //
+//     console.log("createJSONArchitecture")
+//     let MainJSON = []
+//     let MainData = {Architecture: "Sequential"}
+//     MainJSON.push(MainData)
+//     let layers = document.querySelectorAll(".layerType")
+//     if(layers.length>0){
+//         for (let layer of layers){
+//             const index = elementsData.findIndex(data => data.id === layer.id);
+//             // for (const key in elementsData[index]) {
+//             //     if (elementsData[index].hasOwnProperty(key)) {
+//             //         if (!(key=="id") && !(key=="name") && !(key=="kwargs")){
+//             //             console.log(`${key}`)
 
-            
 
-            console.log("")
-        }
-        let combinedJsonString = JSON.stringify(MainJSON);
-            console.log(combinedJsonString);
-        return combinedJsonString
-    }
-    
-}
+
+//             //         }
+
+//             //     }
+
+//             // }
+//             MainJSON.push(elementsData[index])
+
+
+
+//             console.log("")
+//         }
+//         let combinedJsonString = JSON.stringify(MainJSON);
+//             console.log(combinedJsonString);
+//         return combinedJsonString
+//     }
+
+// }
 
 
 
@@ -679,7 +757,7 @@ function createJSONArchitecture(){
 var xhr = null;
 var getXmlHttpRequestObject = function () {
     if (!xhr) {
-        // Create a new XMLHttpRequest object 
+        // Create a new XMLHttpRequest object
         xhr = new XMLHttpRequest();
     }
     return xhr;
@@ -702,13 +780,16 @@ function sendDataCallback() {
 function sendData() {
     console.log("send data function ");
     let dataToSend = generateArchitectureJSON(elementsData, connections)
-    
+
     console.log(dataToSend)
-    
+
     if (!dataToSend) {
         console.log("Data is empty.");
         return;
     }
+    const inputShapeInput = document.getElementsByClassName("ArchitectureShapeInput")[0]
+    dataToSend[0][0].input_shape = inputShapeInput.value
+    console.log(dataToSend)
     let dataToSend2 = {name: architectureNameInput.value, architecture: dataToSend}
     console.log("Sending data:");
     xhr = getXmlHttpRequestObject();
@@ -717,11 +798,11 @@ function sendData() {
     xhr.open("POST", "http://localhost:6969/Architecture", true);
     xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
     // Send the request over the network
-    
+
     xhr.send(JSON.stringify(dataToSend2));
-    
-    
-    
+
+
+
 }
 
 const sendButton = document.getElementById("uploadButton");
@@ -739,6 +820,10 @@ function GetDataCallback(){
         let architecturesData = JSON.parse(xhr.response)
         console.log(architecturesData.length)
         architectureNameCombo.innerHTML = ''
+        let customOption = document.createElement("option");
+            customOption.text = "Default"
+            customOption.value = "Default"
+            architectureNameCombo.appendChild(customOption)
         for(let i=0;i<architecturesData.length;i++){
             console.log("i = ", architecturesData[i])
             GotArchitectures.push({name: architecturesData[i].name, architecture_data: architecturesData[i].architecture_data})
@@ -748,7 +833,7 @@ function GetDataCallback(){
             architectureNameCombo.appendChild(customOption)
         }
         console.log(GotArchitectures)
-        
+
     }
     if (xhr.readyState == 4 && xhr.status == 400) {
         alert("wrong frontend get")
@@ -769,4 +854,156 @@ function getNumberOfArchitecturesFromBackend(){
     xhr.send();
 }
 
-getNumberOfArchitecturesFromBackend()
+const downloadButton = document.getElementById("downloadButton")
+downloadButton.onclick = getNumberOfArchitecturesFromBackend
+
+function recreateArchitectureConnections(architecture){
+    architecture=architecture[0]
+
+    const all = document.getElementById("list").querySelectorAll(".layerType")
+
+    for(let i=0;i<architecture.length;i++){
+        let arch = architecture[i]
+        if(!(architecture[i].constructor === Array)){
+
+            if(i+1<architecture.length){
+                let start
+                let end
+                for(let z=0;z<all.length;z++)
+                {
+                    console.log(all[z].id, arch.id)
+                    if(all[z].id===arch.id){
+                        start = all[z].querySelectorAll(".outputButton")[0]
+
+                    }
+                    if(all[z].id===architecture[i+1].id){
+                        end = all[z].querySelectorAll(".inputButton")[0]
+                    }
+                }
+                console.log(start, end)
+                let recLine = reconstructStartLine(start)
+                reconstructFinishLine(start, end, recLine)
+                //reconstruct connection
+            }
+            else{
+                //do nothing cause last element
+            }
+        }
+        else{
+
+        }
+    }
+}
+
+function recreateArchitecture(architecture){
+    architecture = architecture[0]
+    ////hlip hlip hlip help me god
+    console.log("HELP")
+    console.log("")
+    console.log(architecture)
+    console.log(architecture[0])
+    console.log("")
+    let pageYjump = 0
+    let pageXjump = 0
+    for(let i=0;i<architecture.length;i++){
+
+        if(!(architecture[i].constructor === Array)){
+            reconstructMoreThanLayer(architecture[i],pageXjump +500, i*200 + 200 + pageYjump)
+            // if((i+1)<architecture.length){
+            //     if(!(architecture[i+1].constructor === Array)){
+
+            //     }
+            // }
+
+        }
+        else{
+            pageYjump += test1recration(architecture[i], pageYjump, pageXjump, i)
+            console.log(pageYjump, pageXjump)
+        }
+
+    }
+
+
+
+
+}
+
+function test1recration(architecture, pageYjump, pageXjump, shift){
+    console.log(pageYjump,pageXjump)
+    let size = 0
+    for (let k = 0; k<architecture.length; k++){
+        let arch = architecture[k]
+        pageXjump += k*400
+        for(let i=0;i<arch.length;i++){
+            reconstructMoreThanLayer(arch[i], pageXjump + 500, i*200 + shift*200 + 200)
+            if(size<i*200){
+                size = i*200
+            }
+        }
+    }
+    return size
+
+}
+
+architectureNameCombo.addEventListener("change", recreateMoreThanArchitecture)
+
+function recreateMoreThanArchitecture(){
+    console.log("XDDDDDDDDDDDDD1")
+    console.log(document.getElementById("list").querySelectorAll(".layerType"))
+    console.log(elementsData)
+    console.log(document.getElementById("list").querySelectorAll(".layerType").length)
+    if(curentModel=="Default" && document.getElementById("list").querySelectorAll(".layerType").length>0){
+        const index = GotArchitectures.findIndex(data => data.name === "Default");
+        if (index !== -1) {
+            GotArchitectures.splice(index, 1); // Remove the object from the array
+        }
+        let dataToSend = generateArchitectureJSON(elementsData, connections)
+        const inputShapeInput = document.getElementsByClassName("ArchitectureShapeInput")[0]
+        dataToSend[0][0].input_shape = inputShapeInput.value
+        console.log(dataToSend)
+        let dataToSend2 = {name: "Default", architecture_data: dataToSend}
+        GotArchitectures.push(dataToSend2)
+        console.log("GotArchitectures")
+        console.log(GotArchitectures)
+    }
+    delLayersXD()
+    for(let i=0; i<GotArchitectures.length; i++){
+        if(GotArchitectures[i].name===architectureNameCombo.value){
+            recreateArchitecture(GotArchitectures[i].architecture_data)
+            recreateArchitectureConnections(GotArchitectures[i].architecture_data)
+            curentModel = GotArchitectures[i].name
+
+            break
+        }
+        curentModel="Default"
+    }
+    console.log("XDDDDDDDDDDDDD2")
+    console.log(document.getElementById("list").querySelectorAll(".layerType"))
+    console.log(elementsData)
+
+}
+
+function delLayersXD(){
+    while(elementsData.length>0){
+        console.log(elementsData.length)
+        let elementId = elementsData[0].id
+        const index = elementsData.findIndex(data => data.id === elementId);
+
+        if (connections.length>0){
+            delLine2(elementId)
+        }
+
+        if (index !== -1) {
+            elementsData.splice(index, 1); // Remove the object from the array
+        }
+    }
+
+    const all = document.getElementById("list").querySelectorAll(".layerType")
+    for(let i=all.length-1; i>=0;i--){
+        all[i].remove()
+    }
+
+
+    console.log(all)
+
+}

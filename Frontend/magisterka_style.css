@@ -259,8 +259,7 @@ line{
     width: 100px;
     height:100px;
     position: fixed;
-    top: 50px;
-    left: 50px;
+
     transition: 0.5s;
     color: white;
     &:hover{
@@ -268,10 +267,29 @@ line{
         border-radius: 30px;
     }
 }
-
+#uploadButton{
+    top: 50px;
+    left: 50px;
+}
+#downloadButton{
+    top: 170px;
+    left: 50px;
+}
+#deleteButton{
+    top: 290px;
+    left: 50px;
+}
+#updateButton{
+    top: 410px;
+    left: 50px;
+}
 
 .line{
     pointer-events: all;
+    transition: 0.2s;
+    &:hover{
+        stroke: rgb(121, 18, 18);
+    }
 }
 
 
