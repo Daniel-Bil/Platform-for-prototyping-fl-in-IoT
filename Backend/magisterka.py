@@ -69,7 +69,7 @@ def get_architecture():
         print()
         print(received_data)
 
-        with open(f"architectureJsons\\{received_data['name']}.json", "w") as file:
+        with open(f"Backend\\architectureJsons\\{received_data['name']}.json", "w") as file:
             json.dump(received_data["architecture"], file, indent=4)
 
         # testing_generate_layer(received_data[1])
@@ -98,11 +98,11 @@ def get_architecture():
 @app.route("/ArchitecturesNames", methods=['GET'])
 def get_architecture_names():
     print("GET ArchitectureNames")
-    architectures = os.listdir(f"{os.getcwd()}\\architectureJsons")
+    architectures = os.listdir(f"{os.getcwd()}\\Backend\\architectureJsons")
     print(architectures)
     architecturesList = []
     for architecture in architectures:
-        with open(f"architectureJsons\\{architecture}", 'r') as file:
+        with open(f"Backend\\architectureJsons\\{architecture}", 'r') as file:
             data = json.load(file)
             architecturesList.append({"name":architecture.split(".")[0], "architecture_data":data})
     return flask.Response(response=json.dumps(architecturesList), status=201)
