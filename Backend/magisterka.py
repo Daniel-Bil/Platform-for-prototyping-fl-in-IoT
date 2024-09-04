@@ -6,7 +6,7 @@ import tensorflow as tf
 import tensorflow.keras.layers as Layers
 from tensorflow import keras
 import os
-
+from colorama import Fore
 app = Flask(__name__)
 CORS(app)
 
@@ -37,7 +37,7 @@ def testing_generate_layer(layerType):
     print(type(layerType))
     kwargs = {}
     for key in list(layerType.keys()):
-        if not (key == "id" or key == "name" or key == "kwargs"):
+        if not (key == "id" or key == "name" or key == "kwargs" or key =="input_shape"):
             print(key, layerType[key]["default"])
             if (layerType[key]["type"] == "tuple"):
                 kwargs[key] = tuple([int(l) for l in layerType[key]["default"]])
@@ -56,37 +56,51 @@ def testing_generate_layer(layerType):
 
 def recreate_architecture_from_json(path):
     with open(path, 'r') as file:
-        data = json.load(file)
+        data = json.load(file)[0]
     print(data)
     layers = []
-    layer = testing_generate_layer(data[0])
-    for i in range(data):
+    # print(Fore.BLUE,type(data),Fore.RESET)
+    # print(data[0]["input_shape"])
+    # print(tuple(data[0]["input_shape"]))
+    input_layer = tf.keras.layers.Input(shape=(60,))
+    print(input_layer)
+    layer = testing_generate_layer(data[0])(input_layer)
+    print(layer)
+    for i in range(len(data)):
         if i == 0:
             continue
         print(data[i])
         if not isinstance(data[i], list):
-            if not data[i].name == "Concatenate":
+            if not data[i]["name"] == "Concatenate":
                 layer = testing_generate_layer(data[i])(layer)
             else:
-                layer = tf.keras.Concatenate()(layers)
+                layer = tf.keras.layers.Concatenate()(layers)
                 layers = []
 
         if isinstance(data[i], list):
             for j in range(len(data[i])):
                 layers.append(recreate_branch(layer, data[i][j]))
+    model = tf.keras.Model(inputs=input_layer, outputs=layer)
 
+    # Compile the model
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+    # Print model summary
+    model.summary()
 
 def recreate_branch(parent_layer, rest_of_data):
     if len(rest_of_data) == 0:
         return parent_layer
     layers = []
     layer = parent_layer
-    for z in range(rest_of_data):
+    for z in range(len(rest_of_data)):
         if not isinstance(rest_of_data[z], list):
-            if not rest_of_data[z].name == "Concatenate":
+            print(Fore.GREEN,"xDDDDDDDDDDDD",Fore.RESET)
+            print(rest_of_data[z])
+            if not rest_of_data[z]["name"] == "Concatenate":
                 layer = testing_generate_layer(rest_of_data[z])(layer)
             else:
-                layer = tf.keras.Concatenate()(layers)
+                layer = tf.keras.layers.Concatenate()(layers)
                 layers = []
 
         if isinstance(rest_of_data[z], list):
@@ -97,8 +111,8 @@ def recreate_branch(parent_layer, rest_of_data):
 
 @app.route("/create", methods=['POST'])
 def create():
-    raise NotImplementedError
-
+    recreate_architecture_from_json(f"architectureJsons\\con_test.json")
+    return flask.Response(response=json.dumps({"les":"go"}), status=201)
 
 @app.route("/Architecture", methods=['GET', 'POST'])
 def get_architecture():

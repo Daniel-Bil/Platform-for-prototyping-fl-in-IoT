@@ -209,7 +209,7 @@ export function generateStruct(name, s_id){
     } else if (name === "Dense") {
         parametersCollector.units = { type: "int", values: [], default: 128 };
         parametersCollector.activation = { type: "string", values: ["relu", "sigmoid", "tanh", "softmax", "linear"], default: null };
-        parametersCollector.use_bias = { type: "boolean", values: [true, false], default: true };
+        parametersCollector.use_bias = { type: "boolean", values: ["true", "false"], default: "true" };
         parametersCollector.kernel_initializer = { type: "string", values: ["glorot_uniform", "he_normal", "lecun_normal", "random_normal", "random_uniform", "zeros", "ones"], default: "glorot_uniform" };
         parametersCollector.bias_initializer = { type: "string", values: ["zeros", "ones", "random_normal", "random_uniform"], default: "zeros" };
         parametersCollector.kernel_regularizer = { type: "string", values: [null, "l1", "l2", "l1_l2"], default: null };
