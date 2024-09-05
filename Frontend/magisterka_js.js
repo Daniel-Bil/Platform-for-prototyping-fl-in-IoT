@@ -711,14 +711,14 @@ hiddenButton.onclick = function(){
         menu.style.transform = "translate(-100%)"
 
         const img = document.querySelector('#hiddenButton img');
-        img.style.transform = 'rotate(270deg)';
+        img.style.transform = 'rotate(180deg)';
     }
     else{
         menu.classList.remove("notHidden")
         menu.classList.add("hidden")
         menu.style.transform = "translate(0)"
         const img = document.querySelector('#hiddenButton img');
-        img.style.transform = 'rotate(90deg)';
+        img.style.transform = 'rotate(0deg)';
     }
 }
 
