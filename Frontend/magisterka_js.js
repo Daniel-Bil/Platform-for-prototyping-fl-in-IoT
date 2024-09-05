@@ -20,9 +20,16 @@ const downloadButton = document.getElementById("downloadButton");
 const deleteButton = document.getElementById("deleteButton");
 const updateButton = document.getElementById("updateButton");
 const testButton = document.getElementById("testButton");
-
-
-
+///////////////////////////////
+var xhr = null;
+var getXmlHttpRequestObject = function () {
+    if (!xhr) {
+        // Create a new XMLHttpRequest object
+        xhr = new XMLHttpRequest();
+    }
+    return xhr;
+};
+////////////////////////////////
 let curentModel = "Default"
 
 const architectureNameInput = document.getElementsByClassName("ArchitectureNameInput")[0]
@@ -128,9 +135,8 @@ function reconstructStartLine(button) {
     console.log("reconstructStartLine")
     console.log(button)
     const rect = button.getBoundingClientRect();
-    const startX = rect.left + rect.width / 2;
-    const startY = rect.top + rect.height / 2;
-
+    const startX = rect.left + rect.width / 2 + window.scrollX;
+    const startY = rect.top + rect.height / 2 + window.scrollY;
     let reconstructedLine = createLineElement(startX, startY, startX, startY);
     reconstructedLine.setAttribute("id", button.parentElement.id)
     return reconstructedLine
@@ -233,9 +239,8 @@ function reconstructFinishLine(startButton, endButton, reconstructedLine) {
             {
                 connections.push({start: startButton.parentElement.id, end: endButton.parentElement.id, line: reconstructedLine, startButton:startButton,endButton:endButton})
                 const rect = endButton.getBoundingClientRect();
-                const endX = rect.left + rect.width / 2 + window.scrollX;;
-                const endY = rect.top + rect.height / 2 + window.scrollY;;
-
+                const endX = rect.left + rect.width / 2 + window.scrollX;
+                const endY = rect.top + rect.height / 2 + window.scrollY;
                 reconstructedLine.setAttribute("x2", endX);
                 reconstructedLine.setAttribute("y2", endY);
             }
@@ -243,8 +248,8 @@ function reconstructFinishLine(startButton, endButton, reconstructedLine) {
                 reconstructedLine.setAttribute("id", button.parentElement.id)
                 connections.push({start: endButton.parentElement.id, end: startButton.parentElement.id, line: reconstructedLine, startButton:endButton,endButton:startButton})
                 const rect = endButton.getBoundingClientRect();
-                const endX = rect.left + rect.width / 2 + window.scrollX;;
-                const endY = rect.top + rect.height / 2 + window.scrollY;;
+                const endX = rect.left + rect.width / 2 + window.scrollX;
+                const endY = rect.top + rect.height / 2 + window.scrollY;
                 let newx2 = reconstructedLine.getAttribute("x1"), newy2 = reconstructedLine.getAttribute("y1")
                 reconstructedLine.setAttribute("x1", endX);
                 reconstructedLine.setAttribute("y1", endY);
@@ -761,14 +766,7 @@ hiddenButton.onclick = function(){
 
 ////////////////////////////////////////////////// SENDING DATA TEST
 
-var xhr = null;
-var getXmlHttpRequestObject = function () {
-    if (!xhr) {
-        // Create a new XMLHttpRequest object
-        xhr = new XMLHttpRequest();
-    }
-    return xhr;
-};
+
 
 
 function sendDataCallback() {
