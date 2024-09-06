@@ -673,9 +673,11 @@ function generateInput(elementId, label, type, restOfValues){
     }
     if(restOfValues.default == null){
         input.placeholder = 0
+        input.value = 0
     }
     else{
         input.placeholder = restOfValues.default
+        input.value = restOfValues.default
     }
 
     dataDiv.appendChild(input)

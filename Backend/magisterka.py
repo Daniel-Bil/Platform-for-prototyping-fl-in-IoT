@@ -178,6 +178,21 @@ def get_architecture():
         }
         return flask.Response(response=json.dumps(return_data), status=201)
 
+@app.route("/UpdateArchitecture", methods=["UPDATE"])
+def update_architecture():
+    print("update_architecture")
+    #get request data
+    #check if name exist
+    #save as this file
+    #return info all good or not 
+    
+@app.route("/DeleteArchitecture", methods=["DELETE"])
+def delete_architecture():
+    print("delete_architecture")
+    #get request data
+    #check if name exist
+    #delete as this file
+    #return info all good or not 
 
 @app.route("/ArchitecturesNames", methods=['GET'])
 def get_architecture_names():
@@ -192,14 +207,14 @@ def get_architecture_names():
     return flask.Response(response=json.dumps(architecturesList), status=201)
 
 
-@app.route("/ArchitectureUpdate", methods=['POST'])
-def update_architecture():
-    raise NotImplementedError
+# # @app.route("/ArchitectureUpdate", methods=['POST'])
+# # def update_architecture():
+#     raise NotImplementedError
 
 
-@app.route("/ArchitectureDelete", methods=['POST'])
-def delete_architecture():
-    raise NotImplementedError
+# @app.route("/ArchitectureDelete", methods=['POST'])
+# def delete_architecture():
+#     raise NotImplementedError
 
 
 if __name__ == "__main__":

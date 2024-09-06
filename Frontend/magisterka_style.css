@@ -246,12 +246,53 @@ line{
 .hiddenMenuData{
     display: flex;
     color: #fff;
-    font-size: 30px;
+    font-size: 20px;
     justify-content: left;
+    padding:5px;
+    font-family: Verdana ;
+    gap:2px;
     label{
         width:50%;
+        background: #0d144a;
+        border-radius: 5px;
+        border: 1px solid #fff;
     }
-    
+    input, select{
+        border: 1px solid #fff;
+        border-radius: 5px;
+        background: rgba(5, 15, 70, 0.9);
+        color: #fff;
+        box-shadow: 0 1px 2px #fff;
+        font-family: Verdana ;
+        &:hover{
+            background: rgba(35, 46, 109, 0.9);
+        }
+    }
+    select{
+        width: 100px;
+    }
+    input{
+        width: 50px;
+        text-align: center;
+    }
+    button{
+        border: 1px solid #fff;
+        border-radius: 5px;
+        background: rgba(5, 15, 70, 0.9);
+        color: #fff;
+        &:hover{
+            background: rgba(65, 75, 135, 0.9);
+        }
+    }
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      
+      /* Firefox */
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
 }
 
 .tupleInput{
