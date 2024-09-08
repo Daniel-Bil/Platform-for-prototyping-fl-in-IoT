@@ -724,7 +724,25 @@ hiddenButton.onclick = function(){
     }
 }
 
+const templateButton = document.getElementById("templateButton")
+templateButton.onclick = function(){
+    let menu = document.getElementsByClassName("templateMenu")[0]
+    if (menu.classList.contains('hidden')){
+        menu.classList.remove("hidden")
+        menu.classList.add("notHidden")
+        menu.style.transform = "translateY(500px)"
 
+        const img = document.querySelector('#templateButton img');
+        img.style.transform = 'rotate(90deg)';
+    }
+    else{
+        menu.classList.remove("notHidden")
+        menu.classList.add("hidden")
+        menu.style.transform = "translate(0)"
+        const img = document.querySelector('#templateButton img');
+        img.style.transform = 'rotate(-90deg)';
+    }
+}
 
 
 // function createJSONArchitecture(){
