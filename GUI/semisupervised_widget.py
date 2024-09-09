@@ -11,11 +11,10 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 
 
 class SemiSupervisedWidget(QWidget):
-    def __init__(self, data, better_data):
+    def __init__(self, better_data):
         super(SemiSupervisedWidget, self).__init__()
         self.window = 40
         self.big_window = 500
-        self.data = data["value_temp"]
 
         self.better_data = better_data
 
@@ -274,6 +273,29 @@ class SemiSupervisedWidget(QWidget):
         self.current_data.errors[text].append(self.start_idx+int(self.window//2))
         self.update_images()
 
-    def csamples(self):
+    def csamples2(self):
         for data in self.better_data:
             data.create_samples()
+
+    def csamples(self):
+        minmaxvalues = []
+        for data in self.better_data:
+            min_max = data.return_min_max()
+            minmaxvalues.append(min_max)
+
+        mins = {"value_temp": np.min([m["min"]["value_temp"] for m in minmaxvalues]),
+                "value_hum": np.min([m["min"]["value_hum"] for m in minmaxvalues]),
+                "value_acid": np.min([m["min"]["value_acid"] for m in minmaxvalues])}
+
+        maxs = {"value_temp": np.max([m["max"]["value_temp"] for m in minmaxvalues]),
+                "value_hum": np.max([m["max"]["value_hum"] for m in minmaxvalues]),
+                "value_acid": np.max([m["max"]["value_acid"] for m in minmaxvalues])}
+
+
+
+
+        for data in self.better_data:
+            data.create_samples_normalised(mins=mins,maxs=maxs)
+
+        print("brek")
+

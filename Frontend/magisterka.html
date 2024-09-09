@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI creator</title>
+    <link rel="stylesheet" href="magisterka_style.css">
+</head>
+<body>
+    <!-- *START* HIDDEN MENU FOR LAYER CREATION -->
+    <div id="list" class="creator">
+        <div id="contextMenu" class="context-menu" style="display:none">
+            <ul>
+                <li class="layerdrop">A
+                    <ul>
+                        <li class="layer">Activation</li>
+                        <li class="layer">ActivityRegularization</li>
+                        <li class="layer">Add</li>
+                        <li class="layer">AdditiveAttention</li>
+                        <li class="layer">Attention</li>
+                        <li class="layer">Average
+                            <ul>
+                                <li class="layer">Average</li>
+                                <li class="layer">AveragePooling1D</li>
+                                <li class="layer">AveragePooling2D</li>
+                                <li class="layer">AveragePooling3D</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li class="layerdrop">B
+                    <ul>
+                        <li class="layer">BatchNormalization</li>
+                        <li class="layer">Bidirectional</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">C
+                    <ul>
+                        <li class="layer">CategoryEncoding</li>
+                        <li class="layer">CenterCrop</li>
+                        <li class="layer">Concatenate</li>
+
+                        <li class="layer">Conv
+                            <ul>
+                                <li class="layer">Conv1D</li>
+                                <li class="layer">Conv1DTranspose</li>
+                                <li class="layer">Conv2D</li>
+                                <li class="layer">Conv2DTranspose</li>
+                                <li class="layer">Conv3D</li>
+                                <li class="layer">Conv3DTranspose</li>
+                                <li class="layer">ConvLSTM1D</li>
+                                <li class="layer">ConvLSTM2D</li>
+                                <li class="layer">ConvLSTM3D</li>
+                            </ul>
+                        </li>
+                        <li class="layer">Cropping
+                            <ul>
+                                <li class="layer">Cropping1D</li>
+                                <li class="layer">Cropping2D</li>
+                                <li class="layer">Cropping3D</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li class="layerdrop">D
+                    <ul>
+                        <li class="layer">Dense</li>
+                        <li class="layer">DepthwiseConv1D</li>
+                        <li class="layer">DepthwiseConv2D</li>
+                        <li class="layer">Discretization</li>
+                        <li class="layer">Dot</li>
+                        <li class="layer">Dropout</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">E
+                    <ul>
+                        <li class="layer">ELU</li>
+                        <li class="layer">EinsumDense</li>
+                        <li class="layer">Embedding</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">F
+                    <ul>
+                        <li class="layer">Flatten</li>
+                        <li class="layer">FlaxLayer</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">G
+                    <ul>
+                        <li class="layer">GRU</li>
+                        <li class="layer">GRUCell</li>
+                        <li class="layer">GaussianDropout</li>
+                        <li class="layer">GaussianNoise</li>
+                        <li class="layer">Global
+                            <ul>
+                                <li>GlobalAveragePooling1D</li>
+                                <li>GlobalAveragePooling2D</li>
+                                <li>GlobalAveragePooling3D</li>
+                                <li>GlobalMaxPooling1D</li>
+                                <li>GlobalMaxPooling2D</li>
+                                <li>GlobalMaxPooling3D</li>
+                            </ul>
+                        </li>
+                        <li class="layer">GroupNormalization</li>
+                        <li class="layer">GroupQueryAttention</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">H
+                    <ul>
+                        <li class="layer">HashedCrossing</li>
+                        <li class="layer">Hashing</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">I
+                    <ul>
+                        <li class="layer">Identity</li>
+                        <li class="layer">InputLayer</li>
+                        <li class="layer">InputSpec</li>
+                        <li class="layer">IntegerLookup</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">J
+                    <ul>
+                        <li class="layer">JaxLayer</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">L
+                    <ul>
+                        <li class="layer">LSTM</li>
+                        <li class="layer">LSTMCell</li>
+                        <li class="layer">Lambda</li>
+                        <li class="layer">Layer</li>
+                        <li class="layer">LayerNormalization</li>
+                        <li class="layer">LeakyReLU</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">M
+                    <ul>
+                        <li class="layer">Masking</li>
+                        <li class="layer">MaxPooling
+                            <ul>
+                                <li class="layer">MaxPooling1D</li>
+                                <li class="layer">MaxPooling2D</li>
+                                <li class="layer">MaxPooling3D</li>
+                            </ul>
+                        </li>
+                        <li class="layer">Maximum</li>
+                        <li class="layer">MelSpectrogram</li>
+                        <li class="layer">Minimum</li>
+                        <li class="layer">MultiHeadAttention</li>
+                        <li class="layer">Multiply</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">N
+                    <ul>
+                        <li class="layer">Normalization</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">P
+                    <ul>
+                        <li class="layer">PReLU</li>
+                        <li class="layer">Permute</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">R
+                    <ul>
+                        <li class="layer">RNN</li>
+                        <li class="layer">Random
+                            <ul>
+                                <li class="layer">RandomBrightness</li>
+                                <li class="layer">RandomContrast</li>
+                                <li class="layer">RandomCrop</li>
+                                <li class="layer">RandomFlip</li>
+                                <li class="layer">RandomRotation</li>
+                                <li class="layer">RandomTranslation</li>
+                            </ul>
+                        </li>
+                        <li class="layer">ReLU</li>
+                        <li class="layer">RepeatVector</li>
+                        <li class="layer">Rescaling</li>
+                        <li class="layer">Reshape</li>
+                        <li class="layer">Resizing</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">S
+                    <ul>
+                        <li class="layer">SeparableConv1D</li>
+                        <li class="layer">SeparableConv2D</li>
+                        <li class="layer">SimpleRNN</li>
+                        <li class="layer">SimpleRNNCell</li>
+                        <li class="layer">Softmax</li>
+                        <li class="layer">Spatial
+                            <ul>
+                                <li>SpatialDropout1D</li>
+                                <li>SpatialDropout2D</li>
+                                <li>SpatialDropout3D</li>
+                            </ul>
+                        </li>
+                        <li class="layer">SpectralNormalization</li>
+                        <li class="layer">StackedRNNCells</li>
+                        <li class="layer">StringLookup</li>
+                        <li class="layer">Subtract</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">T
+                    <ul>
+                        <li class="layer">TFSMLayer</li>
+                        <li class="layer">TextVectorization</li>
+                        <li class="layer">TimeDistributed</li>
+                        <li class="layer">TorchModuleWrapper</li>
+                    </ul>
+                </li>
+                <li class="layerdrop">U
+                    <ul>
+                        <li class="layer">UnitNormalization</li>
+                        <li>UpSampling
+                            <ul>
+                                <li class="layer">UpSampling1D</li>
+                                <li class="layer">UpSampling2D</li>
+                                <li class="layer">UpSampling3D</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li class="layerdrop">Z
+                    <ul>
+                        <li>ZeroPadding
+                            <ul>
+                                <li>ZeroPadding1D</li>
+                                <li>ZeroPadding2D</li>
+                                <li>ZeroPadding3D</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+
+        </div>
+    </div>
+    <!-- *END* HIDDEN MENU FOR LAYER CREATION -->
+    <abbr title="Upload current Default model to server">
+        <button id="uploadButton" class="uploadButton glass">UPLOAD</button>
+    </abbr>
+    <abbr title="Download existing architectures from server">
+        <button id="downloadButton" class="uploadButton glass">DOWNLOAD</button>
+    </abbr>
+    
+    <button id="deleteButton" class="uploadButton glass">DELETE</button>
+    <button id="updateButton" class="uploadButton glass">UPDATE</button>
+    <button id="testButton" class="uploadButton glass">TEST</button>
+
+    <div class="basicFunctionality">
+        <div class="basicFunctionalityBlock">
+            <input class="ArchitectureNameInput" type="text" required="required">
+            <span>Architecture Name</span>
+        </div>
+        <div class="basicFunctionalityBlock">
+            <input class="ArchitectureShapeInput" type="text" placeholder="(60,)" required="required">
+            <span>Input Shape</span>
+        </div>
+        
+    </div>
+    <select class="ArchitecturesCombo">
+        <option value="default">Default</option>
+    </select>
+    
+
+
+
+
+    <div class="informationMenu hidden glass">
+        <button id="hiddenButton">
+            <img src="arrow_transparent.png">
+        </button>
+        <div class="hiddenMenuDataList" id="hiddenMenuDataList">
+            <!-- <div class="hiddenMenuData">
+                <label>Input</label>
+                <button class="tupleButton DeletorTuple">
+                    -
+                </button>
+                <input type="number" placeholder="32">
+                <button class="tupleButton GeneratorTuple">
+                    +
+                </button>
+            </div> -->
+            <!-- <div class="hiddenMenuData">
+                <label>Input</label>
+                <input type="text" placeholder="(1,1)">
+    
+            </div>
+            <div class="hiddenMenuData">
+                <label>Input</label>
+                <select>
+                    <option value="0">Relu</option>
+                    <option value="1">Sigmoid</option>
+                    <option value="2" selected>Tanh</option>
+                    <option value="3">1</option>
+                    <option value="4">2</option>
+                    <option value="5">3</option>
+                </select>
+    
+            </div> -->
+        </div>
+        
+
+    </div>
+
+
+    <div class="templateMenu hidden glass">
+        <button id="templateButton">
+            <img src="arrow_transparent.png">
+            <span>Templates</span>
+        </button>
+    </div>
+    <!-- <div class="layerType glass">
+        <button class="inputButton connector"></button>
+        <label class="layerName">LayerName</label>
+        <span class="close">X</span>
+        <div id="activationSelector">
+            <label>Activation Function</label>
+            <select>
+                <option value="0">Relu</option>
+                <option value="1">Sigmoid</option>
+                <option value="2">Tanh</option>
+                <option value="3">1</option>
+                <option value="4">2</option>
+                <option value="5">3</option>
+            </select>
+        </div>
+
+        <div id="inputSelector">
+            <label>Units</label>
+            <input type="text">
+        </div>
+        <button class="outputButton connector"></button>
+    </div> -->
+
+    <svg id="svgContainer"></svg>
+    <script type="module" src="magisterka_js.js"></script>
+</body>
+</html>

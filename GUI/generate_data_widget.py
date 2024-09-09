@@ -11,7 +11,6 @@ from GUI.image_widget import ImageWidget
 from logic.dataProcesing import find_interrupts_withTime
 
 
-
 def find_avg_time(dataframe):
     time_diffs = dataframe.index.to_series().diff()
 
@@ -131,7 +130,7 @@ class GenerateDataWidget(QWidget):
         self.mainLayout.addWidget(self.button1)
 
 
-        self.generation()
+        # self.generation()
 
 
 

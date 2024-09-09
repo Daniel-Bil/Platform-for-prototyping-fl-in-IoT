@@ -1,7 +1,8 @@
+import os
 from functools import partial
-
+import json
 import keras
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QLineEdit
 from GUI.custom_layer_widget import LayerWidget
 from GUI.utils import clearsubLayout
@@ -20,6 +21,7 @@ activation_functions = [
 ]
 
 class ArchitectureWidget(QWidget):
+    new_architecture_signal = Signal()
     def __init__(self):
         super(ArchitectureWidget, self).__init__()
         self.setMinimumHeight(400)
@@ -42,7 +44,11 @@ class ArchitectureWidget(QWidget):
         horizontal.addWidget(newbutton2)
         newbutton1.clicked.connect(self.del_button)
         newbutton1.clicked.connect(self.test1)
+
+        newbutton2.clicked.connect(self.save_architecture_in_json)
+
         self.mainLayout.addLayout(horizontal)
+
 
     def del_button(self):
         idx = self.mainLayout.count() - 1
@@ -98,6 +104,24 @@ class ArchitectureWidget(QWidget):
 
     def finish_layer(self):
         pass
+
+    def save_architecture_in_json(self):
+        print(f"num = {self.mainLayout.count()}")
+        count = self.mainLayout.count()-1
+        layers = []
+        for i in range(count):
+            item = self.mainLayout.itemAt(i)
+            widget = item.widget()
+            if widget is not None:
+                # Perform operations on the widget
+                print(f"Widget at index {i}: {widget} {widget.return_values()}")
+                layers.append(widget.return_values())
+        directory = "./models2"
+        files = os.listdir(directory)
+        file_name = f"{directory}/model_{len(files)}"
+        with open(file_name, 'w') as json_file:
+            json.dump(layers, json_file, indent=4)
+        self.new_architecture_signal.emit()
 
 
 def clearmainLayout(layout):
