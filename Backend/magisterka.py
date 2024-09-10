@@ -7,6 +7,9 @@ import tensorflow.keras.layers as Layers
 from tensorflow import keras
 import os
 from colorama import Fore
+
+from Backend.custom_model import CustomModel
+
 app = Flask(__name__)
 CORS(app)
 
@@ -33,12 +36,10 @@ def testing_generate_layer(layerType):
     """
     Generate layer from given dictionary
     """
-    print(f"{layerType['name']}")
-    print(type(layerType))
+    print(f"{Fore.LIGHTGREEN_EX}{layerType['name']}{Fore.RESET}")
     kwargs = {}
     for key in list(layerType.keys()):
         if not (key == "id" or key == "name" or key == "kwargs" or key =="input_shape"):
-            print(key, layerType[key]["default"])
             if (layerType[key]["type"] == "tuple"):
                 kwargs[key] = tuple([int(l) for l in layerType[key]["default"]])
             elif (layerType[key]["type"] == "int"):
@@ -54,6 +55,29 @@ def testing_generate_layer(layerType):
     return layer
 
 
+def recreate_architecture_from_json2(data, name=""):
+    print(f"{Fore.BLUE}recreate_architecture_from_json2 {name}{Fore.RESET}")
+    layers = []
+
+    input_layer = tf.keras.layers.Input(shape=(3,))
+    layer = testing_generate_layer(data[0])(input_layer)
+    for i in range(len(data)):
+        if i == 0:
+            continue
+        if not isinstance(data[i], list):
+            if not data[i]["name"] == "Concatenate":
+                layer = testing_generate_layer(data[i])(layer)
+            else:
+                layer = tf.keras.layers.Concatenate()(layers)
+                layers = []
+
+        if isinstance(data[i], list):
+            for j in range(len(data[i])):
+                layers.append(recreate_branch(layer, data[i][j]))
+    model = CustomModel(inputs=input_layer, outputs=layer, name=name)
+    return model
+
+
 def recreate_architecture_from_json(path):
     with open(path, 'r') as file:
         data = json.load(file)[0]
@@ -62,7 +86,7 @@ def recreate_architecture_from_json(path):
     # print(Fore.BLUE,type(data),Fore.RESET)
     # print(data[0]["input_shape"])
     # print(tuple(data[0]["input_shape"]))
-    input_layer = tf.keras.layers.Input(shape=(60,))
+    input_layer = tf.keras.layers.Input(shape=(5,))
     print(input_layer)
     layer = testing_generate_layer(data[0])(input_layer)
     print(layer)
@@ -95,8 +119,6 @@ def recreate_branch(parent_layer, rest_of_data):
     layer = parent_layer
     for z in range(len(rest_of_data)):
         if not isinstance(rest_of_data[z], list):
-            print(Fore.GREEN,"xDDDDDDDDDDDD",Fore.RESET)
-            print(rest_of_data[z])
             if not rest_of_data[z]["name"] == "Concatenate":
                 layer = testing_generate_layer(rest_of_data[z])(layer)
             else:
