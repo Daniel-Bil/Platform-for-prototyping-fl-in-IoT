@@ -1,0 +1,24 @@
+[
+    [
+        {
+            "id": "element-1725375788104",
+            "name": "Activation",
+            "activation": {
+                "type": "string",
+                "values": [
+                    "relu",
+                    "sigmoid",
+                    "tanh",
+                    "XD"
+                ],
+                "default": "sigmoid"
+            },
+            "kwargs": {
+                "type": "kwargs",
+                "values": [],
+                "default": null
+            },
+            "input_shape": "(60,)"
+        }
+    ]
+]
