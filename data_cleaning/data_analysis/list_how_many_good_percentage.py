@@ -3,25 +3,25 @@ import pandas as pd
 
 
 def process_csv_files_in_folder(folder_path, label_column='label', target_label='good'):
-    # Iterate through all files in the folder
+    # iterate through all files in the folder
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
 
-        # Check if it's a CSV file
+        # check if it's a .csv file
         if os.path.isfile(file_path) and filename.endswith('.csv'):
-            # Load the CSV file into a DataFrame
+            # load the .csv file into a DataFrame
             df = pd.read_csv(file_path)
 
-            # Check if the label column exists
+            # check if the label column exists
             if label_column in df.columns:
-                # Count occurrences of the target label
+                # count occurrences of the target label
                 total_count = len(df)
                 good_count = (df[label_column] == target_label).sum()
 
-                # Calculate percentage of the target label
+                # calculate percentage of the target label
                 good_percentage = (good_count / total_count) * 100 if total_count > 0 else 0
 
-                # Print results for the file
+                # print results for the file
                 print(f"File: {filename}")
                 print(f"'{target_label}' labels: {good_count}")
                 print(f"Percentage of '{target_label}' labels: {good_percentage:.2f}%\n")

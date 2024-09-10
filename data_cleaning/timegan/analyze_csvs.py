@@ -2,13 +2,13 @@ import os
 import pandas as pd
 
 def calculate_statistics(file_path):
-    # Read the CSV file
+    # read the CSV file
     df = pd.read_csv(file_path)
 
-    # Convert columns to numeric, forcing errors to NaN
+    # convert columns to numeric, forcing errors to NaN
     df = df.apply(pd.to_numeric, errors='coerce')
 
-    # Calculate statistics for temperature, humidity, and acidity
+    # calculate statistics for temperature, humidity, and acidity
     stats = {
         'File': os.path.basename(file_path),
         'Temperature': {
@@ -35,7 +35,7 @@ def calculate_statistics(file_path):
 def process_all_csvs(folder_path="."):
     all_stats = []
 
-    # Process each CSV file in the folder
+    # process each CSV file in the folder
     for file_name in os.listdir(folder_path):
         if file_name.endswith('.csv'):
             file_path = os.path.join(folder_path, file_name)
@@ -43,7 +43,7 @@ def process_all_csvs(folder_path="."):
                 stats = calculate_statistics(file_path)
                 all_stats.append(stats)
 
-                # Print the statistics for each file
+                # print the statistics for each file
                 print(f"File: {stats['File']}")
                 print(f"  Temperature - min: {stats['Temperature']['min']:.4f}, max: {stats['Temperature']['max']:.4f}, mean: {stats['Temperature']['mean']:.4f}, std: {stats['Temperature']['std']:.4f}")
                 print(f"  Humidity    - min: {stats['Humidity']['min']:.4f}, max: {stats['Humidity']['max']:.4f}, mean: {stats['Humidity']['mean']:.4f}, std: {stats['Humidity']['std']:.4f}")
@@ -53,4 +53,4 @@ def process_all_csvs(folder_path="."):
                 print(f"Error processing {file_name}: {e}")
 
 if __name__ == "__main__":
-    process_all_csvs(".")  # Process CSVs in the current folder
+    process_all_csvs(".")  # process .csv in the current folder

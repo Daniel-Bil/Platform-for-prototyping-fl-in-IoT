@@ -8,9 +8,9 @@ from tensorflow.keras.models import Model
 import random  # For generating random numbers
 
 
-# Define TimeGAN Model Components
+# define TimeGAN Model Components
 def build_timegan_model(input_shape, latent_dim):
-    # Generator
+    # generator
     def build_generator():
         inputs = layers.Input(shape=(None, latent_dim))
         x = layers.LSTM(64, return_sequences=True, kernel_regularizer=tf.keras.regularizers.l2(0.01))(inputs)
@@ -24,7 +24,7 @@ def build_timegan_model(input_shape, latent_dim):
         x = layers.Dense(input_shape[1])(x)
         return Model(inputs, x, name="generator")
 
-    # Discriminator
+    # discriminator
     def build_discriminator():
         inputs = layers.Input(shape=(None, input_shape[1]))
         x = layers.LSTM(64, return_sequences=True, kernel_regularizer=tf.keras.regularizers.l2(0.01))(inputs)
@@ -38,7 +38,7 @@ def build_timegan_model(input_shape, latent_dim):
         x = layers.Dense(1)(x)  # No activation function here
         return Model(inputs, x, name="discriminator")
 
-    # Autoencoder
+    # autoencoder
     def build_autoencoder():
         inputs = layers.Input(shape=(None, input_shape[1]))
         x = layers.LSTM(64, return_sequences=True, kernel_regularizer=tf.keras.regularizers.l2(0.01))(inputs)
@@ -57,7 +57,7 @@ def build_timegan_model(input_shape, latent_dim):
     return generator, discriminator, autoencoder
 
 
-# Prepare Data
+# prepare data
 def prepare_data(data_folder_path, seq_len):
     sequences = []
     scaler = MinMaxScaler()
@@ -69,10 +69,10 @@ def prepare_data(data_folder_path, seq_len):
             df['time'] = pd.to_datetime(df['time'])
             df = df[['value_temp', 'value_hum', 'value_acid']]
 
-            # Normalize data
+            # normalize data
             scaled_data = scaler.fit_transform(df)
 
-            # Create sequences
+            # create sequences
             def create_sequences(data, seq_len):
                 seqs = []
                 for i in range(len(data) - seq_len + 1):
@@ -85,35 +85,35 @@ def prepare_data(data_folder_path, seq_len):
     return sequences, scaler
 
 
-# Train TimeGAN
+# train TimeGAN
 def train_timegan(data, epochs=200, batch_size=64):
     input_shape = data.shape[1:]
     latent_dim = 10
 
     generator, discriminator, autoencoder = build_timegan_model(input_shape, latent_dim)
 
-    # Compile models
+    # compile models
     discriminator.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0002), loss='binary_crossentropy')
     generator.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0002), loss='binary_crossentropy')
     autoencoder.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0002), loss='mse')
 
-    # Training Loop
+    # training loop
     for epoch in range(epochs):
-        # Train discriminator
+        # train discriminator
         idx = np.random.randint(0, data.shape[0], batch_size)
         real_data = data[idx]
         noise = np.random.randn(batch_size, input_shape[0], latent_dim)
         fake_data = generator.predict(noise)
 
-        # Add noise to discriminator labels
+        # add noise to discriminator labels
         d_loss_real = discriminator.train_on_batch(real_data, np.ones((batch_size, 1)))
         d_loss_fake = discriminator.train_on_batch(fake_data, np.zeros((batch_size, 1)))
 
-        # Train generator
+        # train generator
         noise = np.random.randn(batch_size, input_shape[0], latent_dim)
         g_loss = discriminator.train_on_batch(generator.predict(noise), np.ones((batch_size, 1)))
 
-        # Print progress
+        # print progress
         if (epoch + 1) % 10 == 0:
             print(
                 f'Epoch {epoch + 1}/{epochs}, D Loss Real: {d_loss_real:.4f}, D Loss Fake: {d_loss_fake:.4f}, G Loss: {g_loss:.4f}')
@@ -121,7 +121,7 @@ def train_timegan(data, epochs=200, batch_size=64):
     return generator
 
 
-# Generate Synthetic Data
+# generate synthetic data
 def generate_synthetic_data(generator, scaler, num_samples=5362, seq_len=10):
     latent_dim = 10
     generated_sequences = generator.predict(np.random.randn(num_samples // seq_len, seq_len, latent_dim))
@@ -129,29 +129,29 @@ def generate_synthetic_data(generator, scaler, num_samples=5362, seq_len=10):
     return synthetic_data
 
 
-# Main Script
+# main script
 def main():
     script_dir = os.path.dirname(__file__)
     data_folder_path = os.path.join(script_dir, '..', 'correct_labeling', 'labeled_data')
 
-    # Generate a random number
+    # generate a random number
     random_number = random.randint(1000, 99999)
 
-    # Create the output file name with the random number
+    # create the output file name with the random number
     output_file = os.path.join(script_dir, f'generated_data_{random_number}.csv')
 
     seq_len = 10
 
-    # Prepare the data
+    # prepare the data
     sequences, scaler = prepare_data(data_folder_path, seq_len)
 
-    # Train TimeGAN
+    # train timeGAN
     generator = train_timegan(sequences, epochs=2000, batch_size=64)
 
-    # Generate synthetic data
+    # generate synthetic data
     synthetic_data = generate_synthetic_data(generator, scaler, num_samples=8192, seq_len=seq_len)
 
-    # Save synthetic data
+    # save synthetic data
     synthetic_df = pd.DataFrame(synthetic_data, columns=['value_temp', 'value_hum', 'value_acid'])
     synthetic_df.to_csv(output_file, index=False)
     print(f'Synthetic data saved to {output_file}')

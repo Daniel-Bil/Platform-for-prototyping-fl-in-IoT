@@ -1,15 +1,15 @@
 import os
 import pandas as pd
 
-# Folder containing the datasets
+# folders containing the input and output datasets
 script_dir = os.path.dirname(__file__)
 data_folder_path = os.path.join(script_dir, '..', 'timegan', 'corrected_data')
 output_folder_path = os.path.join(script_dir, '..', 'timegan', 'labeled_data')  # Folder to save labeled data
 
-# Ensure the output folder exists
+# ensure the output folder exists
 os.makedirs(output_folder_path, exist_ok=True)
 
-# Pre-calculated thresholds (adjust these with your actual values)
+# pre-calculated thresholds
 
 thresholds = {
     'generated_data_15906.csv': {'temp': 7.40, 'hum': 23.04, 'acid': 0.30},
@@ -50,23 +50,22 @@ previous_thresholds = {
     'df_RuralIoT_23.csv': {'temp': 1.38, 'hum': 23.09, 'acid': 0.89}
 }
 
-# Loop through all CSV files in the folder
+# loop through all CSV files in the folder
 for filename in os.listdir(data_folder_path):
     if filename.endswith(".csv"):
         file_path = os.path.join(data_folder_path, filename)
 
-        # Load the dataset
+        # load the dataset
         df = pd.read_csv(file_path)
 
-        # Ensure the time column is parsed as datetime
         #df['time'] = pd.to_datetime(df['time'])
 
-        # Calculate the differences between consecutive rows
+        # calculate the differences between consecutive rows
         temp_diff = df['value_temp'].diff().abs()
         hum_diff = df['value_hum'].diff().abs()
         acid_diff = df['value_acid'].diff().abs()
 
-        # Get the thresholds for the current dataset
+        # get the thresholds for the current dataset
         if filename in thresholds:
             temp_jump_threshold = thresholds[filename]['temp']
             hum_jump_threshold = thresholds[filename]['hum']
@@ -75,39 +74,39 @@ for filename in os.listdir(data_folder_path):
             print(f"Thresholds not found for {filename}. Skipping...")
             continue
 
-        # Add the label column with default value 'good'
+        # add the label column with default value 'good'
         df['label'] = 'good'
 
-        # Identify indices where sudden jumps occur
+        # identify indices where sudden jumps occur
         temp_error_indices = temp_diff[temp_diff > temp_jump_threshold].index
         hum_error_indices = hum_diff[hum_diff > hum_jump_threshold].index
         acid_error_indices = acid_diff[acid_diff > acid_jump_threshold].index
 
-        # Combine all error indices into a set
+        # combine all error indices into a set
         error_indices = set(temp_error_indices) | set(hum_error_indices) | set(acid_error_indices)
 
-        # Label only the row where the sudden jump is detected
+        # label only the row where the sudden jump is detected
         for idx in error_indices:
             df.at[idx, 'label'] = 'error'
 
-        # Handle missing data (gaps) by marking the appropriate rows as 'error'
-        # Define the gap threshold (e.g., 15 minutes)
+        # handle missing data (gaps) by marking the appropriate rows as 'error'
+        # define the gap threshold (e.g., 15 minutes)
         gap_threshold = pd.Timedelta(minutes=15)
         #df['time_diff'] = df['time'].diff()
         #gap_indices = df[df['time_diff'] > gap_threshold].index
 
-        # Label only the row where the gap is detected
+        # label only the row where the gap is detected
         #for idx in gap_indices:
         #    df.at[idx, 'label'] = 'error'
 
-        # Remove intermediate columns before saving
+        # remove intermediate columns before saving
         #df = df.drop(columns=['time_diff'])
 
-        # Save the labeled dataset to a new CSV file
+        # save the labeled dataset to a new CSV file
         labeled_file_path = os.path.join(output_folder_path, filename)
         df.to_csv(labeled_file_path, index=False)
 
-        # Print the thresholds for the current dataset
+        # print the thresholds for the current dataset
         print(f"Dataset: {filename}")
         print(f"Temperature jump threshold: {temp_jump_threshold:.2f}°C")
         print(f"Humidity jump threshold: {hum_jump_threshold:.2f}%")

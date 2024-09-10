@@ -8,9 +8,9 @@ def introduce_errors(df, error_columns, error_probability=0.05, increase_range=(
     df_with_errors = df.copy()
 
     for column in error_columns:
-        # for each row, roll for a chance to apply an error
+        # for each row, roll for a chance to apply an error (only 5% for that to happen)
         for i in range(len(df_with_errors)):
-            if np.random.rand() < error_probability:  # 5% chance to apply error
+            if np.random.rand() < error_probability:
                 # increase the value in the specified column by a random percentage (50% to 200%)
                 increase_percentage = np.random.uniform(increase_range[0], increase_range[1]) / 100
                 df_with_errors.loc[i, column] *= (1 + increase_percentage)  # apply the large increase

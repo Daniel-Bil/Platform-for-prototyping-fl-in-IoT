@@ -11,15 +11,13 @@ def shift_negative_to_positive(df):
 
 
 def scale_values(df, temp_min, temp_max, hum_min, hum_max, acid_min, acid_max):
-    # Scaling Temperature
+    # scaling temperature, humidity and acidity
     temp_range = temp_max - temp_min
     df['value_temp'] = df['value_temp'] / df['value_temp'].max() * temp_range + temp_min
 
-    # Scaling Humidity
     hum_range = hum_max - hum_min
     df['value_hum'] = df['value_hum'] / df['value_hum'].max() * hum_range + hum_min
 
-    # Scaling Acidity
     acid_range = acid_max - acid_min
     df['value_acid'] = df['value_acid'] / df['value_acid'].max() * acid_range + acid_min
 
@@ -35,21 +33,21 @@ def process_files(input_folder, output_folder):
         file_path = os.path.join(input_folder, file)
         df = pd.read_csv(file_path)
 
-        # Convert and scale
+        # convert and scale
         df = shift_negative_to_positive(df)
         df = scale_values(df, temp_min=0, temp_max=30, hum_min=0, hum_max=100, acid_min=2.5, acid_max=4.0)
 
-        # Save to new file
+        # save to new file
         output_path = os.path.join(output_folder, file)
         df.to_csv(output_path, index=False)
 
-        # Print file name
+        # print file name
         print(f'Processed file saved as: {output_path}')
 
 
-# Directories
+# directories
 input_folder = '.'
 output_folder = 'corrected_data'
 
-# Process the files
+# process the files
 process_files(input_folder, output_folder)
