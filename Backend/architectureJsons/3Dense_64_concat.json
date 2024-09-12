@@ -1,0 +1,449 @@
+[
+    [
+        {
+            "id": "element-1725912664364",
+            "name": "Dense",
+            "units": {
+                "type": "int",
+                "values": [],
+                "default": "64"
+            },
+            "activation": {
+                "type": "string",
+                "values": [
+                    "relu",
+                    "sigmoid",
+                    "tanh",
+                    "softmax",
+                    "linear"
+                ],
+                "default": null
+            },
+            "use_bias": {
+                "type": "boolean",
+                "values": [
+                    "true",
+                    "false"
+                ],
+                "default": "true"
+            },
+            "kernel_initializer": {
+                "type": "string",
+                "values": [
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "random_normal",
+                    "random_uniform",
+                    "zeros",
+                    "ones"
+                ],
+                "default": "glorot_uniform"
+            },
+            "bias_initializer": {
+                "type": "string",
+                "values": [
+                    "zeros",
+                    "ones",
+                    "random_normal",
+                    "random_uniform"
+                ],
+                "default": "zeros"
+            },
+            "kernel_regularizer": {
+                "type": "string",
+                "values": [
+                    null,
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ],
+                "default": null
+            },
+            "bias_regularizer": {
+                "type": "string",
+                "values": [
+                    null,
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ],
+                "default": null
+            },
+            "activity_regularizer": {
+                "type": "string",
+                "values": [
+                    null,
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ],
+                "default": null
+            },
+            "kernel_constraint": {
+                "type": "string",
+                "values": [
+                    null,
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm"
+                ],
+                "default": null
+            },
+            "bias_constraint": {
+                "type": "string",
+                "values": [
+                    null,
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm"
+                ],
+                "default": null
+            },
+            "kwargs": {
+                "type": "kwargs",
+                "values": [],
+                "default": null
+            },
+            "input_shape": "(50,)"
+        },
+        [
+            [
+                {
+                    "id": "element-1725912666336",
+                    "name": "Dense",
+                    "units": {
+                        "type": "int",
+                        "values": [],
+                        "default": "64"
+                    },
+                    "activation": {
+                        "type": "string",
+                        "values": [
+                            "relu",
+                            "sigmoid",
+                            "tanh",
+                            "softmax",
+                            "linear"
+                        ],
+                        "default": null
+                    },
+                    "use_bias": {
+                        "type": "boolean",
+                        "values": [
+                            "true",
+                            "false"
+                        ],
+                        "default": "true"
+                    },
+                    "kernel_initializer": {
+                        "type": "string",
+                        "values": [
+                            "glorot_uniform",
+                            "he_normal",
+                            "lecun_normal",
+                            "random_normal",
+                            "random_uniform",
+                            "zeros",
+                            "ones"
+                        ],
+                        "default": "glorot_uniform"
+                    },
+                    "bias_initializer": {
+                        "type": "string",
+                        "values": [
+                            "zeros",
+                            "ones",
+                            "random_normal",
+                            "random_uniform"
+                        ],
+                        "default": "zeros"
+                    },
+                    "kernel_regularizer": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "l1",
+                            "l2",
+                            "l1_l2"
+                        ],
+                        "default": null
+                    },
+                    "bias_regularizer": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "l1",
+                            "l2",
+                            "l1_l2"
+                        ],
+                        "default": null
+                    },
+                    "activity_regularizer": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "l1",
+                            "l2",
+                            "l1_l2"
+                        ],
+                        "default": null
+                    },
+                    "kernel_constraint": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "max_norm",
+                            "non_neg",
+                            "unit_norm"
+                        ],
+                        "default": null
+                    },
+                    "bias_constraint": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "max_norm",
+                            "non_neg",
+                            "unit_norm"
+                        ],
+                        "default": null
+                    },
+                    "kwargs": {
+                        "type": "kwargs",
+                        "values": [],
+                        "default": null
+                    }
+                }
+            ],
+            [
+                {
+                    "id": "element-1725912668330",
+                    "name": "Dense",
+                    "units": {
+                        "type": "int",
+                        "values": [],
+                        "default": "64"
+                    },
+                    "activation": {
+                        "type": "string",
+                        "values": [
+                            "relu",
+                            "sigmoid",
+                            "tanh",
+                            "softmax",
+                            "linear"
+                        ],
+                        "default": null
+                    },
+                    "use_bias": {
+                        "type": "boolean",
+                        "values": [
+                            "true",
+                            "false"
+                        ],
+                        "default": "true"
+                    },
+                    "kernel_initializer": {
+                        "type": "string",
+                        "values": [
+                            "glorot_uniform",
+                            "he_normal",
+                            "lecun_normal",
+                            "random_normal",
+                            "random_uniform",
+                            "zeros",
+                            "ones"
+                        ],
+                        "default": "glorot_uniform"
+                    },
+                    "bias_initializer": {
+                        "type": "string",
+                        "values": [
+                            "zeros",
+                            "ones",
+                            "random_normal",
+                            "random_uniform"
+                        ],
+                        "default": "zeros"
+                    },
+                    "kernel_regularizer": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "l1",
+                            "l2",
+                            "l1_l2"
+                        ],
+                        "default": null
+                    },
+                    "bias_regularizer": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "l1",
+                            "l2",
+                            "l1_l2"
+                        ],
+                        "default": null
+                    },
+                    "activity_regularizer": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "l1",
+                            "l2",
+                            "l1_l2"
+                        ],
+                        "default": null
+                    },
+                    "kernel_constraint": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "max_norm",
+                            "non_neg",
+                            "unit_norm"
+                        ],
+                        "default": null
+                    },
+                    "bias_constraint": {
+                        "type": "string",
+                        "values": [
+                            null,
+                            "max_norm",
+                            "non_neg",
+                            "unit_norm"
+                        ],
+                        "default": null
+                    },
+                    "kwargs": {
+                        "type": "kwargs",
+                        "values": [],
+                        "default": null
+                    }
+                }
+            ]
+        ],
+        {
+            "id": "element-1725912781471",
+            "name": "Concatenate",
+            "axis": {
+                "type": "int",
+                "values": [],
+                "default": -1
+            },
+            "kwargs": {
+                "type": "kwargs",
+                "values": [],
+                "default": null
+            }
+        },
+        {
+            "id": "element-1725912787826",
+            "name": "Dense",
+            "units": {
+                "type": "int",
+                "values": [],
+                "default": "1"
+            },
+            "activation": {
+                "type": "string",
+                "values": [
+                    "relu",
+                    "sigmoid",
+                    "tanh",
+                    "softmax",
+                    "linear"
+                ],
+                "default": null
+            },
+            "use_bias": {
+                "type": "boolean",
+                "values": [
+                    "true",
+                    "false"
+                ],
+                "default": "true"
+            },
+            "kernel_initializer": {
+                "type": "string",
+                "values": [
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "random_normal",
+                    "random_uniform",
+                    "zeros",
+                    "ones"
+                ],
+                "default": "glorot_uniform"
+            },
+            "bias_initializer": {
+                "type": "string",
+                "values": [
+                    "zeros",
+                    "ones",
+                    "random_normal",
+                    "random_uniform"
+                ],
+                "default": "zeros"
+            },
+            "kernel_regularizer": {
+                "type": "string",
+                "values": [
+                    null,
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ],
+                "default": null
+            },
+            "bias_regularizer": {
+                "type": "string",
+                "values": [
+                    null,
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ],
+                "default": null
+            },
+            "activity_regularizer": {
+                "type": "string",
+                "values": [
+                    null,
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ],
+                "default": null
+            },
+            "kernel_constraint": {
+                "type": "string",
+                "values": [
+                    null,
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm"
+                ],
+                "default": null
+            },
+            "bias_constraint": {
+                "type": "string",
+                "values": [
+                    null,
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm"
+                ],
+                "default": null
+            },
+            "kwargs": {
+                "type": "kwargs",
+                "values": [],
+                "default": null
+            }
+        }
+    ]
+]
