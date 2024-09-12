@@ -8,10 +8,11 @@ if __name__ == "__main__":
     # Start the server in a new terminal
     print(os.getcwd())
     print("Starting server...")
-    open_terminal_and_run("server.py")
+    # open_terminal_and_run("server.py")
+    open_terminal_and_run("Aserver.py")
 
     # Give the server some time to start up
-    time.sleep(2)
+    time.sleep(3)
 
     # Start the two clients in separate terminals
     print("Starting client 1...")

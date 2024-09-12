@@ -35,12 +35,6 @@ def receive_full_data(sock, buffer_size=1024):
             break
     return data.decode()
 
-def update_global_model(local_models):
-    # Placeholder function to aggregate local models and update global model
-    global_model = {"weights": [sum(model["weights"]) / len(local_models) for model in local_models]}
-    return global_model
-
-
 
 def load_architectures():
     print("load_architectures")

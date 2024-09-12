@@ -58,11 +58,12 @@ def function2prox(model, data, dataset):
     print("function2prox")
     model.set_weights(np.array([np.array(w) for w in data["weights"]]))
 
-    error = random.randint(2, len(dataset))
+    error = random.randint(4, len(dataset))
     for idx, (batch_data, batch_labels) in enumerate(dataset):
         # Perform a training step
         if idx == error-1:
             break
+        print(f"train batch nr {idx}")
         result = model.train_on_batch(batch_data, batch_labels)
 
 
@@ -95,12 +96,13 @@ def main():
         while True:
 
             # Receive weights from server
+            print(f"{Fore.YELLOW}Receive data{Fore.RESET}")
             received_data = receive_full_data(sock)
 
 
 
             data = json.loads(received_data)
-            print(f"{Fore.LIGHTCYAN_EX}Received data from server: {data['name']} {data['method']} {data['header']}{Fore.RESET}")
+            print(f"{Fore.LIGHTCYAN_EX}Received data from server:{data['id']} {data['name']} {data['method']} {data['header']}{Fore.RESET}")
             if data["method"] == "fedavg":
                 if data["header"]=="1":
                     model = function1(data)
