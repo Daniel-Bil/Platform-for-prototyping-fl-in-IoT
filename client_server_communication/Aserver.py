@@ -84,7 +84,7 @@ def load_architectures():
 
 def load_methods():
     # return ["fedpaq_int", "fedpaq_float", "fedavg", "fedprox"]
-    return ["fedavg", "fedpaq_float", "fedprox"]
+    return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox"]
 
 async def send_full_data(writer, data):
     data = data.encode()
@@ -407,24 +407,30 @@ async def handle_client(reader, writer, shared_state):
                     if iteration+1 == shared_state["iterations"] and method_id+1 == len(shared_state['methods']):
                         async with lock:
                             shared_state['completed_architecture'].append(client_id)
+                # fedpaq_int--------------------------------------------------------------------------------------------------------------
                 if method == "fedpaq_int":
                     # Send data to the client
+
                     if iteration == 0:
+                        q_weights, params = quantize_weights_int(shared_state['global_weights'])
                         data_to_send = json.dumps({
                             "header": "1",
                             "name": shared_state["current_model_name"],
                             "method": method,
                             "data": shared_state['current_architecture'],
-                            "weights": weights2list(shared_state['global_weights']),
-                            "id": client_id
+                            "weights": weights2list(q_weights),
+                            "id": client_id,
+                            "params": params
                         })
                     else:
+                        q_weights, params = quantize_weights_int(shared_state['averaged_weights'])
                         data_to_send = json.dumps({
                             "header": "2",
                             "name": shared_state["current_model_name"],
                             "method": method,
-                            "weights": weights2list(shared_state['averaged_weights']),
-                            "id": client_id
+                            "weights": weights2list(q_weights),
+                            "id": client_id,
+                            "params": params
                         })
 
                     await send_full_data(writer, data_to_send)
@@ -435,7 +441,7 @@ async def handle_client(reader, writer, shared_state):
                     print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
 
                     # Store received weights for this client
-                    shared_state['weights'][client_id] = list2np(received_data_json["weights"])
+                    shared_state['weights'][client_id] = dequantize_weights_int(list2np(received_data_json["weights"]), received_data_json["params"])
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
