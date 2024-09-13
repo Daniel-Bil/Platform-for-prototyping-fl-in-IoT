@@ -13,6 +13,63 @@ from Backend.magisterka import recreate_architecture_from_json2
 
 lock = asyncio.Lock()
 
+
+def simple_quantize_floats(weights_list: list):
+    quantized_weights_list = []
+    for weight in weights_list:
+        quantized_weights = weight.astype(np.float16)
+        quantized_weights_list.append(quantized_weights)
+    return quantized_weights_list
+
+
+# Simple dequantization (float16)
+def simple_dequantize_floats(quantized_weights_list: list):
+    dequantized_weights_list = []
+    for quantized_weights in quantized_weights_list:
+        dequantized_weights = quantized_weights.astype(np.float32)
+        dequantized_weights_list.append(dequantized_weights)
+    return dequantized_weights_list
+
+
+# Quantize weights to int8 with normalization
+def quantize_weights_int(weights: list) -> tuple[list[np.ndarray], list[dict]]:
+    quantized_weights = []
+    params = []
+    for weight in weights:
+        mean = np.mean(weight)
+        std_dev = np.std(weight)
+
+        # Define clipping thresholds
+        clip_min = mean - 2 * std_dev
+        clip_max = mean + 2 * std_dev
+
+        # Clip data
+        clipped_data = np.clip(weight, clip_min, clip_max)
+        max1 = np.max(clipped_data)
+        min1 = np.min(clipped_data)
+
+        # Normalize and quantize
+        norm_data = 2 * ((clipped_data - min1) / (max1 - min1)) - 1
+        quant_data = np.round(127 * norm_data).astype(np.int8)
+
+        param = {'min': float(min1), 'max': float(max1)}
+        quantized_weights.append(quant_data)
+        params.append(param)
+
+    return quantized_weights, params
+
+
+# Dequantize int8 weights back to float32
+def dequantize_weights_int(quantized_weights: list, params: list[dict]) -> list:
+    dequantized_weights = []
+    for weight, param in zip(quantized_weights, params):
+        dequantized_data = weight.astype(np.float32) / 127
+        denorm_data = (dequantized_data + 1) / 2 * (param["max"] - param["min"]) + param["min"]
+        dequantized_weights.append(denorm_data)
+
+    return dequantized_weights
+
+
 def load_architectures():
     print("load_architectures")
     paths = os.listdir(f"{os.getcwd()}\\..\\Backend\\architectureJsons")
@@ -27,7 +84,7 @@ def load_architectures():
 
 def load_methods():
     # return ["fedpaq_int", "fedpaq_float", "fedavg", "fedprox"]
-    return ["fedavg"]
+    return ["fedavg", "fedpaq_float", "fedprox"]
 
 async def send_full_data(writer, data):
     data = data.encode()
@@ -83,7 +140,7 @@ async def handle_client(reader, writer, shared_state):
             for iteration in range(shared_state['iterations']):
 
                 print(Fore.LIGHTWHITE_EX,f"len {method} {iteration} = ", len(shared_state['completed_clients']),shared_state['completed_clients'], shared_state['completed_average_clients'],Fore.RESET)
-
+                # fedavg--------------------------------------------------------------------------------------------------------------
                 if method == "fedavg":
                     # Send data to the client
                     if iteration == 0:
@@ -170,7 +227,7 @@ async def handle_client(reader, writer, shared_state):
                     if iteration+1 == shared_state["iterations"] and method_id+1 == len(shared_state['methods']):
                         async with lock:
                             shared_state['completed_architecture'].append(client_id)
-
+                # fedprox--------------------------------------------------------------------------------------------------------------
                 if method == "fedprox":
                     # Send data to the client
                     if iteration == 0:
@@ -263,6 +320,7 @@ async def handle_client(reader, writer, shared_state):
                     if iteration+1 == shared_state["iterations"] and method_id+1 == len(shared_state['methods']):
                         async with lock:
                             shared_state['completed_architecture'].append(client_id)
+                # fedpaq_float--------------------------------------------------------------------------------------------------------------
                 if method == "fedpaq_float":
                     # Send data to the client
                     if iteration == 0:
@@ -271,7 +329,7 @@ async def handle_client(reader, writer, shared_state):
                             "name": shared_state["current_model_name"],
                             "method": method,
                             "data": shared_state['current_architecture'],
-                            "weights": weights2list(shared_state['global_weights']),
+                            "weights": weights2list(simple_quantize_floats(shared_state['global_weights'])),
                             "id": client_id
                         })
                     else:
@@ -279,7 +337,7 @@ async def handle_client(reader, writer, shared_state):
                             "header": "2",
                             "name": shared_state["current_model_name"],
                             "method": method,
-                            "weights": weights2list(shared_state['averaged_weights']),
+                            "weights": weights2list(simple_quantize_floats(shared_state['averaged_weights'])),
                             "id": client_id
                         })
 
@@ -291,7 +349,7 @@ async def handle_client(reader, writer, shared_state):
                     print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
 
                     # Store received weights for this client
-                    shared_state['weights'][client_id] = list2np(received_data_json["weights"])
+                    shared_state['weights'][client_id] = simple_dequantize_floats(list2np(received_data_json["weights"]))
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -310,7 +368,7 @@ async def handle_client(reader, writer, shared_state):
                         print(f"start averaging {client_id}")
                         weights = []
                         for client_id2 in shared_state['completed_clients']:
-                            weights.append(list2np(shared_state['weights'][client_id2]))
+                            weights.append(shared_state['weights'][client_id2])
                         shared_state['averaged_weights'] = np.mean(weights, axis=0)
                         print("averaging done")
 
