@@ -84,7 +84,7 @@ async def handle_client(reader, writer, shared_state):
 
                 print(Fore.LIGHTWHITE_EX,f"len {method} {iteration} = ", len(shared_state['completed_clients']),shared_state['completed_clients'], shared_state['completed_average_clients'],Fore.RESET)
 
-                if method == "fedavg" or method =="fedprox":
+                if method == "fedavg":
                     # Send data to the client
                     if iteration == 0:
                         data_to_send = json.dumps({
@@ -171,7 +171,270 @@ async def handle_client(reader, writer, shared_state):
                         async with lock:
                             shared_state['completed_architecture'].append(client_id)
 
+                if method == "fedprox":
+                    # Send data to the client
+                    if iteration == 0:
+                        data_to_send = json.dumps({
+                            "header": "1",
+                            "name": shared_state["current_model_name"],
+                            "method": method,
+                            "data": shared_state['current_architecture'],
+                            "weights": weights2list(shared_state['global_weights']),
+                            "id": client_id
+                        })
+                    else:
+                        data_to_send = json.dumps({
+                            "header": "2",
+                            "name": shared_state["current_model_name"],
+                            "method": method,
+                            "weights": weights2list(shared_state['averaged_weights']),
+                            "id": client_id
+                        })
 
+                    await send_full_data(writer, data_to_send)
+
+                    # Wait for the client's updated weights
+                    received_data = await receive_full_data(reader)
+                    received_data_json = json.loads(received_data)
+                    print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
+
+                    # Store received weights for this client
+                    shared_state['weights'][client_id] = list2np(received_data_json["weights"])
+                    shared_state['errors'][client_id] = received_data_json["error"]
+
+                    async with lock:
+                        shared_state['completed_clients'].append(client_id)
+
+                    # Wait for all clients to finish this iteration
+                    while len(shared_state['completed_clients']) < shared_state['total_clients']:
+                        print(f"c waiting {client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']}")
+                        await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
+
+                    print(f"{Fore.LIGHTBLUE_EX} all clients received data : completed clients {shared_state['completed_clients']} {Fore.RESET}")
+                    # Aggregate the weights after all clients have completed
+
+
+
+                    if client_id == shared_state["client_ids"][0]:
+                        print(f"start averaging {client_id}")
+                        weights = []
+                        errors = []
+                        for client_id2 in shared_state['completed_clients']:
+
+                            error_scaled_wieghts = [w * shared_state["errors"][client_id2] for w in shared_state['weights'][client_id2]]
+                            weights.append(error_scaled_wieghts)
+                            errors.append(shared_state["errors"][client_id2])
+                        avg_weights = np.sum(weights, axis=0) / sum(errors)
+                        shared_state['averaged_weights'] = avg_weights
+                        print("averaging done")
+
+
+
+                    async with lock:
+                        print(f"{Fore.LIGHTBLUE_EX}append average with lock{Fore.RESET}")
+                        shared_state['completed_average_clients'].append(client_id)
+
+                    while len(shared_state['completed_average_clients']) < shared_state['total_clients']:
+                        print(f"a waiting {client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']} ")
+                        await asyncio.sleep(0.1)
+
+
+                    async with lock:
+                        shared_state['completed_clients'].remove(client_id)
+                        print(f"{Fore.LIGHTWHITE_EX} Removed {client_id} -> {shared_state['completed_clients']} completed_clients")
+
+                    while len(shared_state['completed_clients']) > 0:
+                        print(f"waiting {client_id} for others to remove itself com:{shared_state['completed_clients']}")
+                        await asyncio.sleep(0.1)
+
+                    async with lock:
+                        shared_state['completed_average_clients'].remove(client_id)
+                        print(f"{Fore.LIGHTWHITE_EX} Removed {client_id} -> {shared_state['completed_average_clients']} completed average")
+
+                    while len(shared_state['completed_average_clients']) > 0:
+                        print(f"waiting {client_id} for others to remove itself com:{shared_state['completed_average_clients']}")
+                        await asyncio.sleep(0.1)
+
+                    print(f"end iteration for {client_id}")
+                    print(f"{client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']}")
+                    if iteration+1 == shared_state["iterations"]:
+                        time.sleep(1)
+
+                    if iteration+1 == shared_state["iterations"] and method_id+1 == len(shared_state['methods']):
+                        async with lock:
+                            shared_state['completed_architecture'].append(client_id)
+                if method == "fedpaq_float":
+                    # Send data to the client
+                    if iteration == 0:
+                        data_to_send = json.dumps({
+                            "header": "1",
+                            "name": shared_state["current_model_name"],
+                            "method": method,
+                            "data": shared_state['current_architecture'],
+                            "weights": weights2list(shared_state['global_weights']),
+                            "id": client_id
+                        })
+                    else:
+                        data_to_send = json.dumps({
+                            "header": "2",
+                            "name": shared_state["current_model_name"],
+                            "method": method,
+                            "weights": weights2list(shared_state['averaged_weights']),
+                            "id": client_id
+                        })
+
+                    await send_full_data(writer, data_to_send)
+
+                    # Wait for the client's updated weights
+                    received_data = await receive_full_data(reader)
+                    received_data_json = json.loads(received_data)
+                    print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
+
+                    # Store received weights for this client
+                    shared_state['weights'][client_id] = list2np(received_data_json["weights"])
+
+                    async with lock:
+                        shared_state['completed_clients'].append(client_id)
+
+                    # Wait for all clients to finish this iteration
+                    while len(shared_state['completed_clients']) < shared_state['total_clients']:
+                        print(f"c waiting {client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']}")
+                        await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
+
+                    print(f"{Fore.LIGHTBLUE_EX} all clients received data : completed clients {shared_state['completed_clients']} {Fore.RESET}")
+                    # Aggregate the weights after all clients have completed
+
+
+
+                    if client_id == shared_state["client_ids"][0]:
+                        print(f"start averaging {client_id}")
+                        weights = []
+                        for client_id2 in shared_state['completed_clients']:
+                            weights.append(list2np(shared_state['weights'][client_id2]))
+                        shared_state['averaged_weights'] = np.mean(weights, axis=0)
+                        print("averaging done")
+
+
+
+                    async with lock:
+                        print(f"{Fore.LIGHTBLUE_EX}append average with lock{Fore.RESET}")
+                        shared_state['completed_average_clients'].append(client_id)
+
+                    while len(shared_state['completed_average_clients']) < shared_state['total_clients']:
+                        print(f"a waiting {client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']} ")
+                        await asyncio.sleep(0.1)
+
+
+                    async with lock:
+                        shared_state['completed_clients'].remove(client_id)
+                        print(f"{Fore.LIGHTWHITE_EX} Removed {client_id} -> {shared_state['completed_clients']} completed_clients")
+
+                    while len(shared_state['completed_clients']) > 0:
+                        print(f"waiting {client_id} for others to remove itself com:{shared_state['completed_clients']}")
+                        await asyncio.sleep(0.1)
+
+                    async with lock:
+                        shared_state['completed_average_clients'].remove(client_id)
+                        print(f"{Fore.LIGHTWHITE_EX} Removed {client_id} -> {shared_state['completed_average_clients']} completed average")
+
+                    while len(shared_state['completed_average_clients']) > 0:
+                        print(f"waiting {client_id} for others to remove itself com:{shared_state['completed_average_clients']}")
+                        await asyncio.sleep(0.1)
+
+                    print(f"end iteration for {client_id}")
+                    print(f"{client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']}")
+                    if iteration+1 == shared_state["iterations"]:
+                        time.sleep(1)
+
+                    if iteration+1 == shared_state["iterations"] and method_id+1 == len(shared_state['methods']):
+                        async with lock:
+                            shared_state['completed_architecture'].append(client_id)
+                if method == "fedpaq_int":
+                    # Send data to the client
+                    if iteration == 0:
+                        data_to_send = json.dumps({
+                            "header": "1",
+                            "name": shared_state["current_model_name"],
+                            "method": method,
+                            "data": shared_state['current_architecture'],
+                            "weights": weights2list(shared_state['global_weights']),
+                            "id": client_id
+                        })
+                    else:
+                        data_to_send = json.dumps({
+                            "header": "2",
+                            "name": shared_state["current_model_name"],
+                            "method": method,
+                            "weights": weights2list(shared_state['averaged_weights']),
+                            "id": client_id
+                        })
+
+                    await send_full_data(writer, data_to_send)
+
+                    # Wait for the client's updated weights
+                    received_data = await receive_full_data(reader)
+                    received_data_json = json.loads(received_data)
+                    print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
+
+                    # Store received weights for this client
+                    shared_state['weights'][client_id] = list2np(received_data_json["weights"])
+
+                    async with lock:
+                        shared_state['completed_clients'].append(client_id)
+
+                    # Wait for all clients to finish this iteration
+                    while len(shared_state['completed_clients']) < shared_state['total_clients']:
+                        print(f"c waiting {client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']}")
+                        await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
+
+                    print(f"{Fore.LIGHTBLUE_EX} all clients received data : completed clients {shared_state['completed_clients']} {Fore.RESET}")
+                    # Aggregate the weights after all clients have completed
+
+
+
+                    if client_id == shared_state["client_ids"][0]:
+                        print(f"start averaging {client_id}")
+                        weights = []
+                        for client_id2 in shared_state['completed_clients']:
+                            weights.append(list2np(shared_state['weights'][client_id2]))
+                        shared_state['averaged_weights'] = np.mean(weights, axis=0)
+                        print("averaging done")
+
+
+
+                    async with lock:
+                        print(f"{Fore.LIGHTBLUE_EX}append average with lock{Fore.RESET}")
+                        shared_state['completed_average_clients'].append(client_id)
+
+                    while len(shared_state['completed_average_clients']) < shared_state['total_clients']:
+                        print(f"a waiting {client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']} ")
+                        await asyncio.sleep(0.1)
+
+
+                    async with lock:
+                        shared_state['completed_clients'].remove(client_id)
+                        print(f"{Fore.LIGHTWHITE_EX} Removed {client_id} -> {shared_state['completed_clients']} completed_clients")
+
+                    while len(shared_state['completed_clients']) > 0:
+                        print(f"waiting {client_id} for others to remove itself com:{shared_state['completed_clients']}")
+                        await asyncio.sleep(0.1)
+
+                    async with lock:
+                        shared_state['completed_average_clients'].remove(client_id)
+                        print(f"{Fore.LIGHTWHITE_EX} Removed {client_id} -> {shared_state['completed_average_clients']} completed average")
+
+                    while len(shared_state['completed_average_clients']) > 0:
+                        print(f"waiting {client_id} for others to remove itself com:{shared_state['completed_average_clients']}")
+                        await asyncio.sleep(0.1)
+
+                    print(f"end iteration for {client_id}")
+                    print(f"{client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_clients']}")
+                    if iteration+1 == shared_state["iterations"]:
+                        time.sleep(1)
+
+                    if iteration+1 == shared_state["iterations"] and method_id+1 == len(shared_state['methods']):
+                        async with lock:
+                            shared_state['completed_architecture'].append(client_id)
     writer.close()
     await writer.wait_closed()
 
@@ -185,10 +448,11 @@ async def main():
     # Shared state among all clients
     shared_state = {
         'weights': {},  # Store the weights returned by all clients
+        'errors': {},
         'completed_clients': [],  # Keep track of completed clients
         'global_weights': None,  # first weights
         'averaged_weights': None,  # Store aggregated global weights
-        'iterations': 5,  # Number of iterations
+        'iterations': 3,  # Number of iterations
         'total_clients': 2,  # Total number of clients (adjust as needed)
         'methods': loaded_methods,  # Store the methods
         "current_model_name": "",
