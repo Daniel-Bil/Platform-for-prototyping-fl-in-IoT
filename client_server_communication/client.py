@@ -59,15 +59,20 @@ def function2prox(model, data, dataset):
     model.set_weights(np.array([np.array(w) for w in data["weights"]]))
 
     error = random.randint(4, len(dataset))
+    results = {
+        "loss": [],
+        "accuracy": []
+    }
     for idx, (batch_data, batch_labels) in enumerate(dataset):
         # Perform a training step
         if idx == error-1:
             break
         print(f"train batch nr {idx}")
-        result = model.train_on_batch(batch_data, batch_labels)
+        loss, accuracy, _, _ = model.train_on_batch(batch_data, batch_labels)
+        results["loss"].append(loss)
+        results["accuracy"].append(accuracy)
 
-
-    return result, error
+    return results, error
 
 def function2paqfloat(model, data):
     print("function2")

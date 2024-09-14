@@ -9,10 +9,19 @@ from colorama import Fore
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Backend.magisterka import recreate_architecture_from_json2
-
+import tensorflow as tf
 
 lock = asyncio.Lock()
 
+def write_to_tensorboard(history_data, log_dir):
+    # Create a TensorBoard summary writer
+    writer = tf.summary.create_file_writer(log_dir)
+
+    # Use the summary writer to log metrics
+    with writer.as_default():
+        for epoch, (acc, loss) in enumerate(zip(history_data['accuracy'], history_data['loss'])):
+            tf.summary.scalar('accuracy', acc, step=epoch)
+            tf.summary.scalar('loss', loss, step=epoch)
 
 def simple_quantize_floats(weights_list: list):
     quantized_weights_list = []
@@ -172,6 +181,17 @@ async def handle_client(reader, writer, shared_state):
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
 
                     async with lock:
+                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                        RESULTS_DIR = "results"
+                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                        os.makedirs(result_path, exist_ok=True)
+                        history_file = os.path.join(result_path, "training_history.json")
+                        with open(history_file, 'w') as f:
+                            json.dump(received_data_json["summary"], f)
+
+                        write_to_tensorboard(received_data_json["summary"], result_path)
+
+                    async with lock:
                         shared_state['completed_clients'].append(client_id)
 
                     # Wait for all clients to finish this iteration
@@ -258,6 +278,17 @@ async def handle_client(reader, writer, shared_state):
                     # Store received weights for this client
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
                     shared_state['errors'][client_id] = received_data_json["error"]
+
+                    async with lock:
+                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                        RESULTS_DIR = "results"
+                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                        os.makedirs(result_path, exist_ok=True)
+                        history_file = os.path.join(result_path, "training_history.json")
+                        with open(history_file, 'w') as f:
+                            json.dump(received_data_json["summary"], f)
+
+                        write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -352,6 +383,17 @@ async def handle_client(reader, writer, shared_state):
                     shared_state['weights'][client_id] = simple_dequantize_floats(list2np(received_data_json["weights"]))
 
                     async with lock:
+                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                        RESULTS_DIR = "results"
+                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                        os.makedirs(result_path, exist_ok=True)
+                        history_file = os.path.join(result_path, "training_history.json")
+                        with open(history_file, 'w') as f:
+                            json.dump(received_data_json["summary"], f)
+
+                        write_to_tensorboard(received_data_json["summary"], result_path)
+
+                    async with lock:
                         shared_state['completed_clients'].append(client_id)
 
                     # Wait for all clients to finish this iteration
@@ -442,6 +484,18 @@ async def handle_client(reader, writer, shared_state):
 
                     # Store received weights for this client
                     shared_state['weights'][client_id] = dequantize_weights_int(list2np(received_data_json["weights"]), received_data_json["params"])
+
+
+                    async with lock:
+                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                        RESULTS_DIR = "results"
+                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                        os.makedirs(result_path, exist_ok=True)
+                        history_file = os.path.join(result_path, "training_history.json")
+                        with open(history_file, 'w') as f:
+                            json.dump(received_data_json["summary"], f)
+
+                        write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
