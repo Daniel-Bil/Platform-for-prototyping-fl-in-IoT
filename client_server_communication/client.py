@@ -5,6 +5,7 @@ import json
 import sys
 import time
 import tensorflow as tf
+import argparse
 
 import numpy as np
 from colorama import Fore
@@ -92,6 +93,10 @@ def function3():
 
 def main():
     print("start client")
+    parser = argparse.ArgumentParser(description="parser to let client read its correct data")
+    parser.add_argument('-d', '--data_id', type=int, help='index of data', required=True)
+    args = parser.parse_args()
+    print(f"data index = {args.data_id}")
     batch_size = 10
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
