@@ -90,7 +90,11 @@ def receive_full_data(sock, buffer_size=1024):
         if len(part) < buffer_size:
             # If the last received part is smaller than the buffer size, it's likely the end
             break
-    print("before decoding = ", data[:30])
+    # Print the first 30 bytes
+    print("First 30 bytes = ", data[:30])
+
+    # Print the last 30 bytes
+    print("Last 30 bytes = ", data[-30:])
     return data.decode()
 
 
