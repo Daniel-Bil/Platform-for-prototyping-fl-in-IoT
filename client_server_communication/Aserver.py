@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Backend.magisterka import recreate_architecture_from_json2
 import tensorflow as tf
+import struct
 
 lock = asyncio.Lock()
 
@@ -98,16 +99,33 @@ def load_methods():
 
 async def send_full_data(writer, data):
     data = data.encode()
+
+    writer.write(struct.pack('!I', len(data)))  # '!I' means big-endian unsigned int
+    await writer.drain()
+
     writer.write(data)
     await writer.drain()
 
+    print("First 30 bytes = ", data[:30])
+    print("Last 30 bytes = ", data[-30:])
+
 async def receive_full_data(reader, buffer_size=1024):
     data = b''
+    test = 0
     while True:
         part = await reader.read(buffer_size)
         data += part
+        test+=1
         if len(part) < buffer_size:
             break
+
+    # Print the first 30 bytes
+    print(test)
+    print("First 30 bytes = ", data[:30])
+
+    # Print the last 30 bytes
+    print("Last 30 bytes = ", data[-30:])
+
     return data.decode()
 
 def weights2list(weights):

@@ -4,7 +4,7 @@ import socket
 import json
 import sys
 import time
-
+import struct
 import pandas as pd
 import tensorflow as tf
 import argparse
@@ -84,18 +84,41 @@ def send_full_data(sock, data, buffer_size=1024):
 
 def receive_full_data(sock, buffer_size=1024):
     data = b''  # Start with empty byte string to accumulate the data
-    while True:
-        part = sock.recv(buffer_size)  # Receive part of the data
-        data += part  # Append to the full data
-        if len(part) < buffer_size:
-            # If the last received part is smaller than the buffer size, it's likely the end
-            break
-    # Print the first 30 bytes
-    print("First 30 bytes = ", data[:30])
+    test = 0
 
-    # Print the last 30 bytes
+    raw_msglen = sock.recv(4)
+    if not raw_msglen:
+        raise ValueError("Failed to receive data length.")
+    msglen = struct.unpack('!I', raw_msglen)[0]
+    print(f"I the client will receive {msglen} bytes or something ;p")
+    data = b''
+    while len(data) < msglen:
+        part = sock.recv(buffer_size)
+        if not part:
+            break
+        data += part
+
+    # Print the first and last 30 bytes for debugging
+    print("First 30 bytes = ", data[:30])
     print("Last 30 bytes = ", data[-30:])
+
     return data.decode()
+
+
+    # while True:
+    #     part = sock.recv(buffer_size)  # Receive part of the data
+    #     data += part  # Append to the full data
+    #     test+=1
+    #     if len(part) < buffer_size:
+    #         # If the last received part is smaller than the buffer size, it's likely the end
+    #         break
+    # # Print the first 30 bytes
+    # print(test)
+    # print("First 30 bytes = ", data[:30])
+    #
+    # # Print the last 30 bytes
+    # print("Last 30 bytes = ", data[-30:])
+    # return data.decode()
 
 
 def function1(data):
