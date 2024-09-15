@@ -3,7 +3,7 @@ import pandas as pd
 
 # folders containing the input and output datasets
 script_dir = os.path.dirname(__file__)
-data_folder_path = os.path.join(script_dir, '..', 'timegan', 'corrected_data')
+data_folder_path = os.path.join(script_dir, '..', 'timegan', 'data_with_errors')
 output_folder_path = os.path.join(script_dir, '..', 'timegan', 'labeled_data')  # Folder to save labeled data
 
 # ensure the output folder exists
@@ -12,30 +12,30 @@ os.makedirs(output_folder_path, exist_ok=True)
 # pre-calculated thresholds
 
 thresholds = {
-    'generated_data_15906.csv': {'temp': 7.40, 'hum': 23.04, 'acid': 0.30},
-    'generated_data_1647.csv': {'temp': 6.24, 'hum': 30.25, 'acid': 0.32},
-    'generated_data_20679.csv': {'temp': 12.96, 'hum': 24.16, 'acid': 0.26},
-    'generated_data_24297.csv': {'temp': 6.39, 'hum': 22.95, 'acid': 0.30},
-    'generated_data_2729.csv': {'temp': 6.18, 'hum': 25.35, 'acid': 0.33},
-    'generated_data_33347.csv': {'temp': 5.84, 'hum': 23.05, 'acid': 0.28},
-    'generated_data_34152.csv': {'temp': 6.61, 'hum': 18.62, 'acid': 0.37},
-    'generated_data_38631.csv': {'temp': 6.12, 'hum': 28.78, 'acid': 0.31},
-    'generated_data_43036.csv': {'temp': 5.91, 'hum': 23.62, 'acid': 0.28},
-    'generated_data_47057.csv': {'temp': 7.01, 'hum': 21.38, 'acid': 0.55},
-    'generated_data_48200.csv': {'temp': 5.63, 'hum': 16.45, 'acid': 0.31},
-    'generated_data_53310.csv': {'temp': 5.82, 'hum': 21.12, 'acid': 0.29},
-    'generated_data_60536.csv': {'temp': 10.32, 'hum': 19.09, 'acid': 0.43},
-    'generated_data_66592.csv': {'temp': 5.67, 'hum': 19.60, 'acid': 0.32},
-    'generated_data_69040.csv': {'temp': 5.57, 'hum': 21.32, 'acid': 0.59},
-    'generated_data_71715.csv': {'temp': 6.85, 'hum': 25.89, 'acid': 0.40},
-    'generated_data_72640.csv': {'temp': 5.29, 'hum': 20.37, 'acid': 0.40},
-    'generated_data_76411.csv': {'temp': 7.02, 'hum': 28.24, 'acid': 0.23},
-    'generated_data_77379.csv': {'temp': 5.61, 'hum': 20.81, 'acid': 0.29},
-    'generated_data_83638.csv': {'temp': 10.24, 'hum': 18.10, 'acid': 0.35},
-    'generated_data_8543.csv': {'temp': 8.01, 'hum': 34.05, 'acid': 0.52},
-    'generated_data_86512.csv': {'temp': 5.08, 'hum': 29.97, 'acid': 0.27},
-    'generated_data_87090.csv': {'temp': 6.23, 'hum': 31.49, 'acid': 0.28},
-    'generated_data_92039.csv': {'temp': 5.59, 'hum': 20.45, 'acid': 0.33}
+    'generated_data_15906.csv': {'temp': 7.56, 'hum': 23.45, 'acid': 0.51},
+    'generated_data_1647.csv': {'temp': 6.43, 'hum': 30.83, 'acid': 0.52},
+    'generated_data_20679.csv': {'temp': 13.25, 'hum': 25.33, 'acid': 0.49},
+    'generated_data_24297.csv': {'temp': 6.67, 'hum': 23.70, 'acid': 0.50},
+    'generated_data_2729.csv': {'temp': 6.42, 'hum': 26.18, 'acid': 0.52},
+    'generated_data_33347.csv': {'temp': 6.15, 'hum': 24.30, 'acid': 0.50},
+    'generated_data_34152.csv': {'temp': 6.84, 'hum': 19.21, 'acid': 0.53},
+    'generated_data_38631.csv': {'temp': 6.34, 'hum': 29.63, 'acid': 0.51},
+    'generated_data_43036.csv': {'temp': 6.09, 'hum': 24.19, 'acid': 0.48},
+    'generated_data_47057.csv': {'temp': 7.36, 'hum': 21.93, 'acid': 0.70},
+    'generated_data_48200.csv': {'temp': 5.91, 'hum': 17.07, 'acid': 0.51},
+    'generated_data_53310.csv': {'temp': 6.08, 'hum': 22.19, 'acid': 0.51},
+    'generated_data_60536.csv': {'temp': 10.45, 'hum': 20.03, 'acid': 0.60},
+    'generated_data_66592.csv': {'temp': 6.08, 'hum': 20.77, 'acid': 0.51},
+    'generated_data_69040.csv': {'temp': 5.98, 'hum': 22.01, 'acid': 0.69},
+    'generated_data_71715.csv': {'temp': 7.13, 'hum': 26.96, 'acid': 0.58},
+    'generated_data_72640.csv': {'temp': 5.66, 'hum': 20.96, 'acid': 0.58},
+    'generated_data_76411.csv': {'temp': 7.36, 'hum': 29.08, 'acid': 0.45},
+    'generated_data_77379.csv': {'temp': 6.13, 'hum': 21.49, 'acid': 0.48},
+    'generated_data_83638.csv': {'temp': 10.57, 'hum': 18.99, 'acid': 0.55},
+    'generated_data_8543.csv': {'temp': 8.33, 'hum': 34.53, 'acid': 0.64},
+    'generated_data_86512.csv': {'temp': 5.43, 'hum': 30.86, 'acid': 0.49},
+    'generated_data_87090.csv': {'temp': 6.54, 'hum': 31.92, 'acid': 0.49},
+    'generated_data_92039.csv': {'temp': 5.87, 'hum': 21.80, 'acid': 0.53}
 }
 
 
@@ -75,11 +75,11 @@ for filename in os.listdir(data_folder_path):
             continue
 
         # add the label column with default value 'good'
-        df['label'] = 'good'
+        df['label'] = '0'
 
         # identify indices where sudden jumps occur
         temp_error_indices = temp_diff[temp_diff > temp_jump_threshold].index
-        hum_error_indices = hum_diff[hum_diff > hum_jump_threshold].index
+        hum_error_indices = hum_diff[(hum_diff > hum_jump_threshold) | (df['value_hum'] > 100)].index
         acid_error_indices = acid_diff[acid_diff > acid_jump_threshold].index
 
         # combine all error indices into a set
@@ -87,17 +87,17 @@ for filename in os.listdir(data_folder_path):
 
         # label only the row where the sudden jump is detected
         for idx in error_indices:
-            df.at[idx, 'label'] = 'error'
+            df.at[idx, 'label'] = '1'
 
         # handle missing data (gaps) by marking the appropriate rows as 'error'
         # define the gap threshold (e.g., 15 minutes)
         gap_threshold = pd.Timedelta(minutes=15)
-        #df['time_diff'] = df['time'].diff()
-        #gap_indices = df[df['time_diff'] > gap_threshold].index
+        df['time_diff'] = df['time'].diff()
+        gap_indices = df[df['time_diff'] > gap_threshold].index
 
         # label only the row where the gap is detected
-        #for idx in gap_indices:
-        #    df.at[idx, 'label'] = 'error'
+        for idx in gap_indices:
+            df.at[idx, 'label'] = 'error'
 
         # remove intermediate columns before saving
         #df = df.drop(columns=['time_diff'])

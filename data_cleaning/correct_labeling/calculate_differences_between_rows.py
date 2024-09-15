@@ -9,7 +9,7 @@ import numpy as np
 
 # for time gan
 script_dir = os.path.dirname(__file__)
-data_folder_path = os.path.join(script_dir, '..', 'timegan', 'corrected_data')
+data_folder_path = os.path.join(script_dir, '..', 'timegan', 'data_with_errors')
 
 
 # loop through all CSV files in the folder
