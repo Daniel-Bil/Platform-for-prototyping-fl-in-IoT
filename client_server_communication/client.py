@@ -4,17 +4,69 @@ import socket
 import json
 import sys
 import time
+
+import pandas as pd
 import tensorflow as tf
 import argparse
 
 import numpy as np
 from colorama import Fore
+from sklearn.model_selection import train_test_split
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Backend.magisterka import recreate_architecture_from_json2
 
-x_train = np.random.rand(100, 3)
-y_train = np.random.randint(0, 2, size=(100,))
 
+def read_csv_by_index(directory, index):
+    # Get a list of all CSV files in the directory
+    csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+
+    # Check if the provided index is within the range
+    if index < 0 or index >= len(csv_files):
+        raise IndexError("Index out of range. Please provide a valid index.")
+
+    # Get the filename at the specified index
+    selected_file = csv_files[index]
+
+    # Create full file path
+    file_path = os.path.join(directory, selected_file)
+
+    # Read the CSV file
+    df = pd.read_csv(file_path)
+    print(f"Loaded file: {selected_file}")
+
+    return df
+
+
+def create_dataset(df, window_size=5):
+    data = []
+    labels = []
+
+    # Determine the middle index of the window
+    middle_index = window_size // 2
+
+    # Loop through the dataframe with a sliding window
+    for i in range(len(df) - window_size + 1):
+        # Extract the window for each column
+        temp_window = df['value_temp'].iloc[i:i + window_size].values
+        hum_window = df['value_hum'].iloc[i:i + window_size].values
+        acid_window = df['value_acid'].iloc[i:i + window_size].values
+
+        # Concatenate the values to create a single input array
+        input_values = np.concatenate((temp_window, hum_window, acid_window))
+
+        # Get the label of the middle value in the window
+        label = df['label'].iloc[i + middle_index]
+
+        # Append to the dataset
+        data.append(input_values)
+        labels.append(label)
+
+    # Convert to numpy arrays
+    data = np.array(data)
+    labels = np.array(labels)
+
+    return data, labels
 def send_full_data(sock, data, buffer_size=1024):
     # If the data is a string, encode it to bytes
     data = data.encode()
@@ -49,10 +101,10 @@ def function1(data):
                                                         tf.keras.metrics.Recall(name='recall')])
     return model
 
-def function2(model, data):
+def function2(model, data, X_train, Y_train):
     print("function2")
     model.set_weights(np.array([np.array(w) for w in data["weights"]]))
-    history = model.fit(x_train, y_train, epochs=10)
+    history = model.fit(X_train, Y_train, epochs=2)
     return history
 
 def function2prox(model, data, dataset):
@@ -75,21 +127,18 @@ def function2prox(model, data, dataset):
 
     return results, error
 
-def function2paqfloat(model, data):
+def function2paqfloat(model, data, X_train, Y_train):
     print("function2")
     model.set_weights(model.simple_dequantize_floats(np.array([np.array(w) for w in data["weights"]])))
-    history = model.fit(x_train, y_train, epochs=10)
+    history = model.fit(X_train, Y_train, epochs=2)
     return history
 
-def function2paqint(model, data):
+def function2paqint(model, data, X_train, Y_train):
     print("function2")
 
     model.set_weights(model.dequantize_weights_int(np.array([np.array(w) for w in data["weights"]]), data["params"]))
-    history = model.fit(x_train, y_train, epochs=10)
+    history = model.fit(X_train, Y_train, epochs=2)
     return history
-
-def function3():
-    print("f3")
 
 def main():
     print("start client")
@@ -97,7 +146,13 @@ def main():
     parser.add_argument('-d', '--data_id', type=int, help='index of data', required=True)
     args = parser.parse_args()
     print(f"data index = {args.data_id}")
-    batch_size = 10
+
+    print("load data")
+    loaded_data = read_csv_by_index("..\\dane\\generated_data", args.data_id)
+    data, labels = create_dataset(loaded_data)
+    x_train, x_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=42)
+
+    batch_size = len(x_train)//10
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.connect(('localhost', 8090))  # Connect to the server
@@ -118,9 +173,9 @@ def main():
             if data["method"] == "fedavg":
                 if data["header"]=="1":
                     model = function1(data)
-                    history = function2(model, data)
+                    history = function2(model, data, x_train, y_train)
                 if data["header"]=="2":
-                    history = function2(model, data)
+                    history = function2(model, data, x_train, y_train)
 
                 data_to_send = json.dumps({"weights": [w.tolist() for w in model.get_weights()],
                                            "summary": history.history})
@@ -142,9 +197,9 @@ def main():
             if data["method"] == "fedpaq_float":
                 if data["header"] == "1":
                     model = function1(data)
-                    history = function2paqfloat(model, data)
+                    history = function2paqfloat(model, data, x_train, y_train)
                 if data["header"] == "2":
-                    history = function2paqfloat(model, data)
+                    history = function2paqfloat(model, data, x_train, y_train)
 
                 data_to_send = json.dumps({"weights": [w.tolist() for w in model.simple_quantize_floats(model.get_weights())],
                                            "summary": history.history})
@@ -154,9 +209,9 @@ def main():
             if data["method"] == "fedpaq_int":
                 if data["header"] == "1":
                     model = function1(data)
-                    history = function2paqint(model, data)
+                    history = function2paqint(model, data, x_train, y_train)
                 if data["header"] == "2":
-                    history = function2paqint(model, data)
+                    history = function2paqint(model, data, x_train, y_train)
                 q_weights, params = model.quantize_weights_int(model.get_weights())
                 data_to_send = json.dumps({"weights": [w.tolist() for w in q_weights],
                                            "params": params,

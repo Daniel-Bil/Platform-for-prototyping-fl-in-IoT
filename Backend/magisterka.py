@@ -59,7 +59,7 @@ def recreate_architecture_from_json2(data, name=""):
     print(f"{Fore.BLUE}recreate_architecture_from_json2 {name}{Fore.RESET}")
     layers = []
 
-    input_layer = tf.keras.layers.Input(shape=(3,))
+    input_layer = tf.keras.layers.Input(shape=(15,))
     layer = testing_generate_layer(data[0])(input_layer)
     for i in range(len(data)):
         if i == 0:

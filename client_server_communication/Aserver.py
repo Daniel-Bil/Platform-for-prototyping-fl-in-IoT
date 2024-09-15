@@ -5,8 +5,9 @@ import asyncio
 import time
 
 import numpy as np
+import pandas as pd
 from colorama import Fore
-
+from sklearn.model_selection import train_test_split
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Backend.magisterka import recreate_architecture_from_json2
 import tensorflow as tf
@@ -84,7 +85,7 @@ def load_architectures():
     paths = os.listdir(f"{os.getcwd()}\\..\\Backend\\architectureJsons")
     datas = []
     for idx, path in enumerate(paths):
-        if idx<1:
+        if idx<4:
             with open(f"{os.getcwd()}\\..\\Backend\\architectureJsons\\{path}", 'r') as file:
                 data = json.load(file)[0]
                 datas.append({"name": path.split(".")[0], "data": data})
@@ -556,9 +557,64 @@ async def handle_client(reader, writer, shared_state):
     writer.close()
     await writer.wait_closed()
 
+
+def read_csv_by_index(directory, index):
+    # Get a list of all CSV files in the directory
+    csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+
+    # Check if the provided index is within the range
+    if index < 0 or index >= len(csv_files):
+        raise IndexError("Index out of range. Please provide a valid index.")
+
+    # Get the filename at the specified index
+    selected_file = csv_files[index]
+
+    # Create full file path
+    file_path = os.path.join(directory, selected_file)
+
+    # Read the CSV file
+    df = pd.read_csv(file_path)
+    print(f"Loaded file: {selected_file}")
+
+    return df
+
+
+def create_dataset(df, window_size=5):
+    data = []
+    labels = []
+
+    # Determine the middle index of the window
+    middle_index = window_size // 2
+
+    # Loop through the dataframe with a sliding window
+    for i in range(len(df) - window_size + 1):
+        # Extract the window for each column
+        temp_window = df['value_temp'].iloc[i:i + window_size].values
+        hum_window = df['value_hum'].iloc[i:i + window_size].values
+        acid_window = df['value_acid'].iloc[i:i + window_size].values
+
+        # Concatenate the values to create a single input array
+        input_values = np.concatenate((temp_window, hum_window, acid_window))
+
+        # Get the label of the middle value in the window
+        label = df['label'].iloc[i + middle_index]
+
+        # Append to the dataset
+        data.append(input_values)
+        labels.append(label)
+
+    # Convert to numpy arrays
+    data = np.array(data)
+    labels = np.array(labels)
+
+    return data, labels
+
 async def main():
-    x_train = np.random.rand(100, 3)
-    y_train = np.random.randint(0, 2, size=(100,))
+
+    loaded_data = read_csv_by_index("..\\dane\\generated_data", 0)
+    data, labels = create_dataset(loaded_data)
+    x_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=42)
+
     # Load architectures and methods
     loaded_architectures = load_architectures()
     loaded_methods = load_methods()
@@ -594,8 +650,9 @@ async def main():
 
             # Train the model on the server
 
-            model.fit(x_train, y_train, epochs=40)
-
+            model.fit(x_train, y_train, epochs=2)
+            loss, accuracy = model.evaluate(X_test, y_test)
+            print(f"{Fore.LIGHTGREEN_EX} Test Accuracy {shared_state['current_model_name']} before : {accuracy:.2f}{Fore.RESET}")
             # Store the trained model's weights in the shared state to distribute to clients
             shared_state['global_weights'] = model.get_weights()
             shared_state['current_architecture'] = architecture  # Track the current architecture
@@ -604,8 +661,13 @@ async def main():
                 print("waiting to go to next arch")
                 await asyncio.sleep(0.5)
             # Start the server and wait for client connections
-            print("clear completed_architecture in server loop cause it is 1???? i think so")
-            shared_state['completed_architecture'] =[]
+
+            print(f"{Fore.LIGHTBLUE_EX}clear completed_architecture in server loop cause it is 1???? i think so{Fore.RESET}")
+            model.set_weights(shared_state['averaged_weights'])
+
+            loss, accuracy = model.evaluate(X_test, y_test)
+            print(f"{Fore.LIGHTGREEN_EX} Test Accuracy {shared_state['current_model_name']} after : {accuracy:.2f}{Fore.RESET}")
+            shared_state['completed_architecture'] = []
         shared_state["finished"] = True
         await server.serve_forever()
 
