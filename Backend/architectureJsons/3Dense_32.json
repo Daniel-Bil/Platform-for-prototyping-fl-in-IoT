@@ -105,7 +105,7 @@
                 "values": [],
                 "default": null
             },
-            "input_shape": "(50,)"
+            "input_shape": "(15,)"
         },
         {
             "id": "element-1725912666336",

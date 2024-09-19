@@ -1,3 +1,5 @@
+import sys
+
 from flask import Flask, request
 import flask
 from flask_cors import CORS
@@ -8,6 +10,7 @@ from tensorflow import keras
 import os
 from colorama import Fore
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Backend.custom_model import CustomModel
 
 app = Flask(__name__)
@@ -59,7 +62,7 @@ def recreate_architecture_from_json2(data, name=""):
     print(f"{Fore.BLUE}recreate_architecture_from_json2 {name}{Fore.RESET}")
     layers = []
 
-    input_layer = tf.keras.layers.Input(shape=(15,))
+    input_layer = tf.keras.layers.Input(shape = eval(data[0]["input_shape"]))
     layer = testing_generate_layer(data[0])(input_layer)
     for i in range(len(data)):
         if i == 0:
@@ -86,7 +89,7 @@ def recreate_architecture_from_json(path):
     # print(Fore.BLUE,type(data),Fore.RESET)
     # print(data[0]["input_shape"])
     # print(tuple(data[0]["input_shape"]))
-    input_layer = tf.keras.layers.Input(shape=(5,))
+    input_layer = tf.keras.layers.Input(shape = eval(data[0]["input_shape"]))
     print(input_layer)
     layer = testing_generate_layer(data[0])(input_layer)
     print(layer)
@@ -134,7 +137,7 @@ def recreate_branch(parent_layer, rest_of_data):
 @app.route("/create", methods=['POST'])
 def create():
     recreate_architecture_from_json(f"architectureJsons\\con_test.json")
-    return flask.Response(response=json.dumps({"les":"go"}), status=201)
+    return flask.Response(response=json.dumps({"les": "go"}), status=201)
 
 @app.route("/Architecture", methods=['GET', 'POST'])
 def get_architecture():
@@ -152,47 +155,6 @@ def get_architecture():
             json.dump(received_data["architecture"], file, indent=4)
         from tensorflow.keras import layers, Model
 
-        # input_shape = 10  # Replace with your input shape
-        # input_layer = layers.Input(shape=(input_shape,))
-
-        # # Define parent layer
-        # parent_layer = layers.Dense(64, activation='relu')(input_layer)
-
-        # # Left branch with 3 layers
-        # left_branch = layers.Dense(32, activation='relu')(parent_layer)
-        # left_branch = layers.Dense(32, activation='relu')(left_branch)
-        # left_branch = layers.Dense(32, activation='relu')(left_branch)
-
-        # # Right branch with 2 layers
-        # right_branch = layers.Dense(32, activation='relu')(parent_layer)
-        # right_branch = layers.Dense(32, activation='relu')(right_branch)
-
-        # # Merge branches
-        # merged = layers.Concatenate()([left_branch, right_branch])
-
-        # # Final output layer
-        # output_layer = layers.Dense(1, activation='sigmoid')(merged)
-
-        # # Create the model
-        # model = Model(inputs=input_layer, outputs=output_layer)
-
-        # # Compile the model
-        # model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-        # # Print the model summary
-        # model.summary()
-
-        # testing_generate_layer(received_data[1])
-
-        # for i in range(len(received_data)):
-        #     print("i = ",i)
-        #     if not i==0:
-        #         model = testing_generate_model(model, testing_generate_layer(received_data[i],i))
-        # model.summary()
-        # model.compile(optimizer='adam',
-        #       loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        #       metrics=[keras.metrics.SparseCategoricalAccuracy()])
-        # model.summary()
 
         return_data = {
             "status": "success",
@@ -200,17 +162,54 @@ def get_architecture():
         }
         return flask.Response(response=json.dumps(return_data), status=201)
 
-@app.route("/UpdateArchitecture", methods=["UPDATE"])
+@app.route("/UpdateArchitecture", methods=["POST"])
 def update_architecture():
     print("update_architecture")
-    #get request data
-    #check if name exist
-    #save as this file
-    #return info all good or not 
+    received_data = request.get_json()
+    architecture_name = received_data['name']
+    file_path = f"architectureJsons\\{architecture_name}.json"
+
+    # Check if the architecture exists
+    if os.path.exists(file_path):
+        # Save the updated architecture to the file
+        with open(f"architectureJsons\\{received_data['name']}.json", "w") as file:
+            json.dump(received_data["architecture"], file, indent=4)
+
+        return_data = {
+            "status": "success",
+            "message": f"Architecture '{architecture_name}' updated successfully."
+        }
+        return flask.Response(response=json.dumps(return_data), status=200)
+    else:
+        return_data = {
+            "status": "error",
+            "message": f"Architecture '{architecture_name}' does not exist."
+        }
+        return flask.Response(response=json.dumps(return_data), status=404)
     
 @app.route("/DeleteArchitecture", methods=["DELETE"])
 def delete_architecture():
     print("delete_architecture")
+    received_data = request.get_json()
+    print(f"received data")
+
+    architecture_name = received_data['name']
+    file_path = f"architectureJsons\\{architecture_name}.json"
+    if os.path.exists(file_path):
+        # Delete the file
+        os.remove(file_path)
+
+        return_data = {
+            "status": "success",
+            "message": f"Architecture '{architecture_name}' deleted successfully."
+        }
+        return flask.Response(response=json.dumps(return_data), status=200)
+    else:
+        return_data = {
+            "status": "error",
+            "message": f"Architecture '{architecture_name}' does not exist."
+        }
+        return flask.Response(response=json.dumps(return_data), status=404)
     #get request data
     #check if name exist
     #delete as this file

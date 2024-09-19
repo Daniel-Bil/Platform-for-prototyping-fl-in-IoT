@@ -982,14 +982,18 @@ function recreateMoreThanArchitecture(){
         if (index !== -1) {
             GotArchitectures.splice(index, 1); // Remove the object from the array
         }
-        let dataToSend = generateArchitectureJSON(elementsData, connections)
-        const inputShapeInput = document.getElementsByClassName("ArchitectureShapeInput")[0]
-        dataToSend[0][0].input_shape = inputShapeInput.value
-        console.log(dataToSend)
-        let dataToSend2 = {name: "Default", architecture_data: dataToSend}
-        GotArchitectures.push(dataToSend2)
-        console.log("GotArchitectures")
-        console.log(GotArchitectures)
+        try{
+            let dataToSend = generateArchitectureJSON(elementsData, connections)
+            const inputShapeInput = document.getElementsByClassName("ArchitectureShapeInput")[0]
+            dataToSend[0][0].input_shape = inputShapeInput.value
+            console.log(dataToSend)
+            let dataToSend2 = {name: "Default", architecture_data: dataToSend}
+            GotArchitectures.push(dataToSend2)
+            console.log("GotArchitectures")
+            console.log(GotArchitectures)
+        } catch(error){
+            alert("wrong architecture")
+        }
     }
     delLayersXD()
     for(let i=0; i<GotArchitectures.length; i++){
@@ -1055,3 +1059,77 @@ function testPostMessage(){
 }
 
 testButton.onclick = testPostMessage
+
+
+function deleteCallback(){
+    // Check response is ready or not
+    if (xhr.readyState == 4 && xhr.status == 201) {
+        console.log("create 201")
+    }
+    if (xhr.readyState == 4 && xhr.status == 400) {
+        alert("create 400")
+    }
+    if (xhr.readyState == 4 && xhr.status == 404) {
+        alert("cant delete - no such architecture in directory")
+    }
+    if (xhr.readyState == 4 && xhr.status == 500) {
+        alert("create 500")
+    }
+}
+
+function deleteMessage(){
+    console.log("testPostMessage");
+    xhr = getXmlHttpRequestObject();
+    xhr.onreadystatechange = deleteCallback;
+    xhr.open("DELETE", "http://localhost:6969/DeleteArchitecture", true);
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhr.send(JSON.stringify({name: architectureNameCombo.value}));
+}
+
+
+
+function updateCallback() {
+    // Check response is ready or not
+    if (xhr.readyState == 4 && xhr.status == 201) {
+        console.log("Data creation response received!");
+    }
+    if (xhr.readyState == 4 && xhr.status == 400) {
+        alert("Architecture hasnt been send wrong coding contact programmer")
+    }
+    if (xhr.readyState == 4 && xhr.status == 500) {
+        alert("Architecture has been send but wrong backend contact programmer")
+    }
+}
+
+function updateData() {
+    console.log("send data function ");
+    let dataToSend = generateArchitectureJSON(elementsData, connections)
+
+    console.log(dataToSend)
+
+    if (!dataToSend) {
+        console.log("Data is empty.");
+        return;
+    }
+    const inputShapeInput = document.getElementsByClassName("ArchitectureShapeInput")[0]
+    dataToSend[0][0].input_shape = inputShapeInput.value
+    console.log(dataToSend)
+    let dataToSend2 = {name: architectureNameCombo.value, architecture: dataToSend}
+    console.log("Sending data:");
+    xhr = getXmlHttpRequestObject();
+    xhr.onreadystatechange = sendDataCallback;
+    // asynchronous requests
+    xhr.open("POST", "http://localhost:6969/UpdateArchitecture", true);
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    // Send the request over the network
+
+    xhr.send(JSON.stringify(dataToSend2));
+
+
+
+}
+
+
+testButton.onclick = testPostMessage
+deleteButton.onclick = deleteMessage
+updateButton.onclick = updateData
