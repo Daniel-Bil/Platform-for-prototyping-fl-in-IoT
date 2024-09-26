@@ -95,7 +95,8 @@ def load_architectures():
 
 def load_methods():
     # return ["fedpaq_int", "fedpaq_float", "fedavg", "fedprox"]
-    return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox"]
+    # return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox"]
+    return ["fedprox"]
 
 async def send_full_data(writer, data):
     data = data.encode()

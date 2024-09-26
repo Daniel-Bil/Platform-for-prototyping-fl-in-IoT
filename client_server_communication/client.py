@@ -17,6 +17,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Backend.magisterka import recreate_architecture_from_json2
 
 
+def convert_np2list(weights):
+    if isinstance(weights, (np.ndarray, list)):
+        return [convert_np2list(x) for x in weights]
+    elif isinstance(weights, np.generic):
+        return weights.item()
+    else:
+        return weights
+
 def read_csv_by_index(directory, index):
     # Get a list of all CSV files in the directory
     csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
@@ -94,7 +102,10 @@ def receive_full_data(sock, buffer_size=1024):
     data = b''
     while len(data) < msglen:
         part = sock.recv(buffer_size)
+        print(f"acquired part of length = {len(part)}")
         if not part:
+            if len(data) < msglen:
+                print(f"{Fore.LIGHTRED_EX}INCOMPLETE TRANSMISION {len(data)} < {msglen} {Fore.RESET}")
             break
         data += part
 
@@ -134,6 +145,63 @@ def function2(model, data, X_train, Y_train):
     model.set_weights(np.array([np.array(w) for w in data["weights"]]))
     history = model.fit(X_train, Y_train, epochs=2)
     return history
+
+
+def function2betterprox(model, data, dataset, mu=0.01):
+    print("function2prox")
+
+    # Get the initial global weights (from the server)
+    global_weights = np.array([np.array(w) for w in data["weights"]])
+
+    # Set the local model's weights to the global weights
+    model.set_weights(global_weights)
+
+    error = random.randint(4, len(dataset))
+    results = {
+        "loss": [],
+        "accuracy": []
+    }
+
+    optimizer = model.optimizer
+
+    # Perform training with the proximal term
+    for idx, (batch_data, batch_labels) in enumerate(dataset):
+        if idx == error - 1:
+            break
+        print(f"train batch nr {idx}")
+
+        # Use GradientTape to manually calculate gradients
+        with tf.GradientTape() as tape:
+            # Forward pass: compute predictions and regular loss
+            predictions = model(batch_data, training=True)
+            loss = model.compiled_loss(batch_labels, predictions)  # Use model's compiled loss function (e.g., cross-entropy)
+
+            # Compute the proximal term: penalty for weight deviation
+            local_weights = model.trainable_variables
+            prox_term = 0
+            for local_w, global_w in zip(local_weights, global_weights):
+                prox_term += tf.reduce_sum(tf.square(local_w - global_w))
+
+            # Add the proximal term to the loss
+            prox_penalty = (mu / 2) * prox_term
+            total_loss = loss + prox_penalty
+
+        # Compute gradients with respect to the total loss
+        gradients = tape.gradient(total_loss, model.trainable_variables)
+
+        # Apply gradients to update the model's weights
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+        model.compiled_metrics.update_state(batch_labels, predictions)
+
+        # Access the accuracy (or other metrics) results
+        accuracy = model.compiled_metrics.metrics[0].result()  # Assuming
+
+        # Save the results
+        results["loss"].append(float(total_loss.numpy()))  # Convert the tensor to a numpy value
+        results["accuracy"].append(float(accuracy.numpy()))
+
+    return results, error
 
 def function2prox(model, data, dataset):
     print("function2prox")
@@ -213,13 +281,13 @@ def main():
             if data["method"] == "fedprox":
                 if data["header"] == "1":
                     model = function1(data)
-                    history, error = function2prox(model, data, train_dataset)
+                    history, error = function2betterprox(model, data, train_dataset)
                 if data["header"] == "2":
-                    history, error = function2prox(model, data, train_dataset)
-
-                data_to_send = json.dumps({"weights": [w.tolist() for w in model.get_weights()],
+                    history, error = function2betterprox(model, data, train_dataset)
+                data_to_send = json.dumps({"weights": convert_np2list(model.get_weights()),
                                            "summary": history,
                                            "error": error})
+
                 send_full_data(sock, data_to_send)
                 print("Sent updated weights + history to server")
             if data["method"] == "fedpaq_float":
