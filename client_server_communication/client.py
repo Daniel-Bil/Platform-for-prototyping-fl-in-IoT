@@ -278,6 +278,18 @@ def main():
                 send_full_data(sock, data_to_send)
                 print("Sent updated weights + history to server")
 
+            if data["method"] == "fedma":
+                if data["header"]=="1":
+                    model = function1(data)
+                    history = function2(model, data, x_train, y_train)
+                if data["header"]=="2":
+                    history = function2(model, data, x_train, y_train)
+
+                data_to_send = json.dumps({"weights": [w.tolist() for w in model.get_weights()],
+                                           "summary": history.history})
+                send_full_data(sock, data_to_send)
+                print("Sent updated weights + history to server")
+
             if data["method"] == "fedprox":
                 if data["header"] == "1":
                     model = function1(data)
