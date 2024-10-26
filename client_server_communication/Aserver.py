@@ -8,9 +8,15 @@ import numpy as np
 import pandas as pd
 from colorama import Fore
 from sklearn.model_selection import train_test_split
+
+from client_server_communication.converting import weights2list, list2np, simple_quantize_floats, \
+    simple_dequantize_floats, quantize_weights_int, dequantize_weights_int
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Backend.magisterka import recreate_architecture_from_json2
 import tensorflow as tf
+from pathlib import Path
+
 import struct
 from scipy.optimize import linear_sum_assignment
 
@@ -100,70 +106,18 @@ def aggregate_weights_fedma(client_weights):
     return global_weights
 
 
-def write_to_tensorboard(history_data, log_dir):
+def write_to_tensorboard(history_data, log_dir, start_step=0):
     # Create a TensorBoard summary writer
     writer = tf.summary.create_file_writer(log_dir)
 
-    # Use the summary writer to log metrics
+    # Use the summary writer to log metrics, incrementing the step for each iteration
     with writer.as_default():
-        for epoch, (acc, loss) in enumerate(zip(history_data['accuracy'], history_data['loss'])):
-            tf.summary.scalar('accuracy', acc, step=epoch)
-            tf.summary.scalar('loss', loss, step=epoch)
-
-def simple_quantize_floats(weights_list: list):
-    quantized_weights_list = []
-    for weight in weights_list:
-        quantized_weights = weight.astype(np.float16)
-        quantized_weights_list.append(quantized_weights)
-    return quantized_weights_list
+        for step, (acc, loss) in enumerate(zip(history_data['accuracy'], history_data['loss']), start=start_step):
+            tf.summary.scalar('accuracy', acc, step=step)
+            tf.summary.scalar('loss', loss, step=step)
+            writer.flush()
 
 
-# Simple dequantization (float16)
-def simple_dequantize_floats(quantized_weights_list: list):
-    dequantized_weights_list = []
-    for quantized_weights in quantized_weights_list:
-        dequantized_weights = quantized_weights.astype(np.float32)
-        dequantized_weights_list.append(dequantized_weights)
-    return dequantized_weights_list
-
-
-# Quantize weights to int8 with normalization
-def quantize_weights_int(weights: list) -> tuple[list[np.ndarray], list[dict]]:
-    quantized_weights = []
-    params = []
-    for weight in weights:
-        mean = np.mean(weight)
-        std_dev = np.std(weight)
-
-        # Define clipping thresholds
-        clip_min = mean - 2 * std_dev
-        clip_max = mean + 2 * std_dev
-
-        # Clip data
-        clipped_data = np.clip(weight, clip_min, clip_max)
-        max1 = np.max(clipped_data)
-        min1 = np.min(clipped_data)
-
-        # Normalize and quantize
-        norm_data = 2 * ((clipped_data - min1) / (max1 - min1)) - 1
-        quant_data = np.round(127 * norm_data).astype(np.int8)
-
-        param = {'min': float(min1), 'max': float(max1)}
-        quantized_weights.append(quant_data)
-        params.append(param)
-
-    return quantized_weights, params
-
-
-# Dequantize int8 weights back to float32
-def dequantize_weights_int(quantized_weights: list, params: list[dict]) -> list:
-    dequantized_weights = []
-    for weight, param in zip(quantized_weights, params):
-        dequantized_data = weight.astype(np.float32) / 127
-        denorm_data = (dequantized_data + 1) / 2 * (param["max"] - param["min"]) + param["min"]
-        dequantized_weights.append(denorm_data)
-
-    return dequantized_weights
 
 
 def load_architectures():
@@ -171,7 +125,7 @@ def load_architectures():
     paths = os.listdir(f"{os.getcwd()}\\..\\Backend\\architectureJsons")
     datas = []
     for idx, path in enumerate(paths):
-        if idx<4:
+        if idx<2:
             with open(f"{os.getcwd()}\\..\\Backend\\architectureJsons\\{path}", 'r') as file:
                 data = json.load(file)[0]
                 datas.append({"name": path.split(".")[0], "data": data})
@@ -180,8 +134,8 @@ def load_architectures():
 
 def load_methods():
     # return ["fedpaq_int", "fedpaq_float", "fedavg", "fedprox"]
-    # return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox"]
-    return ["fedma"]
+    # return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox", "fedma"]
+    return ["fedavg"]
 
 async def send_full_data(writer, data):
     data = data.encode()
@@ -214,11 +168,14 @@ async def receive_full_data(reader, buffer_size=1024):
 
     return data.decode()
 
-def weights2list(weights):
-    return [w.tolist() for w in weights]
 
-def list2np(weights):
-    return np.array([np.array(w) for w in weights])
+
+
+async def test1(shared_state):
+    while shared_state['global_weights'] is None:
+        print(f"{Fore.LIGHTMAGENTA_EX}SHORT W8 FOR GLOBAL WEIGHTS{Fore.RESET}")
+        await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
+
 
 async def handle_client(reader, writer, shared_state):
     _, client_id = writer.get_extra_info('peername')
@@ -227,8 +184,9 @@ async def handle_client(reader, writer, shared_state):
     current_architecture_name = None
     print(f"{Fore.CYAN}INFO{writer.get_extra_info('peername')}{Fore.RESET}")
     #wait untill server performs first action
-    while shared_state['global_weights'] is None:
-        await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
+    # while shared_state['global_weights'] is None:
+    #     await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
+    await test1(shared_state)
 
     while True:
 
@@ -285,16 +243,16 @@ async def handle_client(reader, writer, shared_state):
                     # Store received weights for this client
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
 
-                    async with lock:
-                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                        RESULTS_DIR = "results"
-                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                        os.makedirs(result_path, exist_ok=True)
-                        history_file = os.path.join(result_path, "training_history.json")
-                        with open(history_file, 'w') as f:
-                            json.dump(received_data_json["summary"], f)
-
-                        write_to_tensorboard(received_data_json["summary"], result_path)
+                    # async with lock:
+                    #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                    #     RESULTS_DIR = "results"
+                    #     result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                    #     os.makedirs(result_path, exist_ok=True)
+                    #     history_file = os.path.join(result_path, "training_history.json")
+                    #     with open(history_file, 'w') as f:
+                    #         json.dump(received_data_json["summary"], f)
+                    #
+                    #     write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -308,7 +266,7 @@ async def handle_client(reader, writer, shared_state):
                     # Aggregate the weights after all clients have completed
 
 
-
+                    # aggreagate model and evaluate
                     if client_id == shared_state["client_ids"][0]:
                         print(f"start averaging {client_id}")
                         weights = []
@@ -317,7 +275,23 @@ async def handle_client(reader, writer, shared_state):
                         shared_state['averaged_weights'] = np.mean(weights, axis=0)
                         print("averaging done")
 
+                        test_model = recreate_architecture_from_json2(shared_state['current_architecture']["data"], shared_state['current_architecture']["name"])
+                        test_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                                                        tf.keras.metrics.Precision(name='precision'),
+                                                                                        tf.keras.metrics.Recall(name='recall')])
 
+                        results = test_model.evaluate(shared_state['test_data_x'], shared_state['test_data_y'])
+                        loss = results[0]
+                        accuracy = results[1]
+
+                        results_dir = Path("results")
+                        result_path = results_dir / f"aggregated_{shared_state['current_model_name']}_{method}"
+                        result_path.mkdir(parents=True, exist_ok=True)
+                        evaluation_file = result_path / "aggregated_evaluation.json"
+                        with evaluation_file.open('w') as f:
+                            json.dump({"loss": loss, "accuracy": accuracy}, f)
+
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path), start_step=iteration)
 
                     async with lock:
                         print(f"{Fore.LIGHTBLUE_EX}append average with lock{Fore.RESET}")
@@ -384,16 +358,16 @@ async def handle_client(reader, writer, shared_state):
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
                     shared_state['errors'][client_id] = received_data_json["error"]
 
-                    async with lock:
-                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                        RESULTS_DIR = "results"
-                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                        os.makedirs(result_path, exist_ok=True)
-                        history_file = os.path.join(result_path, "training_history.json")
-                        with open(history_file, 'w') as f:
-                            json.dump(received_data_json["summary"], f)
-
-                        write_to_tensorboard(received_data_json["summary"], result_path)
+                    # async with lock:
+                    #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                    #     RESULTS_DIR = "results"
+                    #     result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                    #     os.makedirs(result_path, exist_ok=True)
+                    #     history_file = os.path.join(result_path, "training_history.json")
+                    #     with open(history_file, 'w') as f:
+                    #         json.dump(received_data_json["summary"], f)
+                    #
+                    #     write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -421,6 +395,26 @@ async def handle_client(reader, writer, shared_state):
                         shared_state['averaged_weights'] = avg_weights
                         print("averaging done")
 
+                        test_model = recreate_architecture_from_json2(shared_state['current_architecture']["data"],
+                                                                      shared_state['current_architecture']["name"])
+                        test_model.compile(optimizer='adam', loss='binary_crossentropy',
+                                           metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                    tf.keras.metrics.Precision(name='precision'),
+                                                    tf.keras.metrics.Recall(name='recall')])
+
+                        results = test_model.evaluate(shared_state['test_data_x'], shared_state['test_data_y'])
+                        loss = results[0]
+                        accuracy = results[1]
+
+                        results_dir = Path("results")
+                        result_path = results_dir / f"aggregated_{shared_state['current_model_name']}_{method}"
+                        result_path.mkdir(parents=True, exist_ok=True)
+                        evaluation_file = result_path / "aggregated_evaluation.json"
+                        with evaluation_file.open('w') as f:
+                            json.dump({"loss": loss, "accuracy": accuracy}, f)
+
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
+                                             start_step=iteration)
 
 
                     async with lock:
@@ -487,16 +481,16 @@ async def handle_client(reader, writer, shared_state):
                     # Store received weights for this client
                     shared_state['weights'][client_id] = simple_dequantize_floats(list2np(received_data_json["weights"]))
 
-                    async with lock:
-                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                        RESULTS_DIR = "results"
-                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                        os.makedirs(result_path, exist_ok=True)
-                        history_file = os.path.join(result_path, "training_history.json")
-                        with open(history_file, 'w') as f:
-                            json.dump(received_data_json["summary"], f)
-
-                        write_to_tensorboard(received_data_json["summary"], result_path)
+                    # async with lock:
+                    #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                    #     RESULTS_DIR = "results"
+                    #     result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                    #     os.makedirs(result_path, exist_ok=True)
+                    #     history_file = os.path.join(result_path, "training_history.json")
+                    #     with open(history_file, 'w') as f:
+                    #         json.dump(received_data_json["summary"], f)
+                    #
+                    #     write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -518,7 +512,26 @@ async def handle_client(reader, writer, shared_state):
                             weights.append(shared_state['weights'][client_id2])
                         shared_state['averaged_weights'] = np.mean(weights, axis=0)
                         print("averaging done")
+                        test_model = recreate_architecture_from_json2(shared_state['current_architecture']["data"],
+                                                                      shared_state['current_architecture']["name"])
+                        test_model.compile(optimizer='adam', loss='binary_crossentropy',
+                                           metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                    tf.keras.metrics.Precision(name='precision'),
+                                                    tf.keras.metrics.Recall(name='recall')])
 
+                        results = test_model.evaluate(shared_state['test_data_x'], shared_state['test_data_y'])
+                        loss = results[0]
+                        accuracy = results[1]
+
+                        results_dir = Path("results")
+                        result_path = results_dir / f"aggregated_{shared_state['current_model_name']}_{method}"
+                        result_path.mkdir(parents=True, exist_ok=True)
+                        evaluation_file = result_path / "aggregated_evaluation.json"
+                        with evaluation_file.open('w') as f:
+                            json.dump({"loss": loss, "accuracy": accuracy}, f)
+
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
+                                             start_step=iteration)
 
 
                     async with lock:
@@ -590,18 +603,6 @@ async def handle_client(reader, writer, shared_state):
                     # Store received weights for this client
                     shared_state['weights'][client_id] = dequantize_weights_int(list2np(received_data_json["weights"]), received_data_json["params"])
 
-
-                    async with lock:
-                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                        RESULTS_DIR = "results"
-                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                        os.makedirs(result_path, exist_ok=True)
-                        history_file = os.path.join(result_path, "training_history.json")
-                        with open(history_file, 'w') as f:
-                            json.dump(received_data_json["summary"], f)
-
-                        write_to_tensorboard(received_data_json["summary"], result_path)
-
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
 
@@ -622,7 +623,26 @@ async def handle_client(reader, writer, shared_state):
                             weights.append(list2np(shared_state['weights'][client_id2]))
                         shared_state['averaged_weights'] = np.mean(weights, axis=0)
                         print("averaging done")
+                        test_model = recreate_architecture_from_json2(shared_state['current_architecture']["data"],
+                                                                      shared_state['current_architecture']["name"])
+                        test_model.compile(optimizer='adam', loss='binary_crossentropy',
+                                           metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                    tf.keras.metrics.Precision(name='precision'),
+                                                    tf.keras.metrics.Recall(name='recall')])
 
+                        results = test_model.evaluate(shared_state['test_data_x'], shared_state['test_data_y'])
+                        loss = results[0]
+                        accuracy = results[1]
+
+                        results_dir = Path("results")
+                        result_path = results_dir / f"aggregated_{shared_state['current_model_name']}_{method}"
+                        result_path.mkdir(parents=True, exist_ok=True)
+                        evaluation_file = result_path / "aggregated_evaluation.json"
+                        with evaluation_file.open('w') as f:
+                            json.dump({"loss": loss, "accuracy": accuracy}, f)
+
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
+                                             start_step=iteration)
 
 
                     async with lock:
@@ -689,16 +709,16 @@ async def handle_client(reader, writer, shared_state):
                     # Store received weights for this client
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
 
-                    async with lock:
-                        print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                        RESULTS_DIR = "results"
-                        result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                        os.makedirs(result_path, exist_ok=True)
-                        history_file = os.path.join(result_path, "training_history.json")
-                        with open(history_file, 'w') as f:
-                            json.dump(received_data_json["summary"], f)
-
-                        write_to_tensorboard(received_data_json["summary"], result_path)
+                    # async with lock:
+                    #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
+                    #     RESULTS_DIR = "results"
+                    #     result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
+                    #     os.makedirs(result_path, exist_ok=True)
+                    #     history_file = os.path.join(result_path, "training_history.json")
+                    #     with open(history_file, 'w') as f:
+                    #         json.dump(received_data_json["summary"], f)
+                    #
+                    #     write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -721,7 +741,26 @@ async def handle_client(reader, writer, shared_state):
 
                         shared_state['averaged_weights'] = aggregate_weights_fedma(weights)
                         print("averaging done")
+                        test_model = recreate_architecture_from_json2(shared_state['current_architecture']["data"],
+                                                                      shared_state['current_architecture']["name"])
+                        test_model.compile(optimizer='adam', loss='binary_crossentropy',
+                                           metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
+                                                    tf.keras.metrics.Precision(name='precision'),
+                                                    tf.keras.metrics.Recall(name='recall')])
 
+                        results = test_model.evaluate(shared_state['test_data_x'], shared_state['test_data_y'])
+                        loss = results[0]
+                        accuracy = results[1]
+
+                        results_dir = Path("results")
+                        result_path = results_dir / f"aggregated_{shared_state['current_model_name']}_{method}"
+                        result_path.mkdir(parents=True, exist_ok=True)
+                        evaluation_file = result_path / "aggregated_evaluation.json"
+                        with evaluation_file.open('w') as f:
+                            json.dump({"loss": loss, "accuracy": accuracy}, f)
+
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
+                                             start_step=iteration)
 
 
                     async with lock:
@@ -812,6 +851,11 @@ def create_dataset(df, window_size=5):
 
     return data, labels
 
+async def test2(shared_state):
+    while len(shared_state['completed_architecture']) < shared_state['total_clients']:
+        print(f"{Fore.LIGHTMAGENTA_EX}waiting to go to next arch{Fore.RESET}")
+        await asyncio.sleep(0.5)
+
 async def main():
 
     loaded_data = read_csv_by_index("..\\dane\\generated_data", 0)
@@ -829,14 +873,16 @@ async def main():
         'completed_clients': [],  # Keep track of completed clients
         'global_weights': None,  # first weights
         'averaged_weights': None,  # Store aggregated global weights
-        'iterations': 3,  # Number of iterations
+        'iterations': 10,  # Number of iterations
         'total_clients': 2,  # Total number of clients (adjust as needed)
         'methods': loaded_methods,  # Store the methods
         "current_model_name": "",
         'completed_average_clients': [],
         "client_ids": [],
         "completed_architecture": [],
-        "finished": False
+        "finished": False,
+        "test_data_x": X_test,
+        "test_data_y": y_test
     }
     server = await asyncio.start_server(lambda r, w: handle_client(r, w, shared_state), 'localhost', 8090)
     print("async with server")
@@ -860,9 +906,10 @@ async def main():
             shared_state['global_weights'] = model.get_weights()
             shared_state['current_architecture'] = architecture  # Track the current architecture
 
-            while len(shared_state['completed_architecture']) < shared_state['total_clients']:
-                print("waiting to go to next arch")
-                await asyncio.sleep(0.5)
+            await test2(shared_state)
+            # while len(shared_state['completed_architecture']) < shared_state['total_clients']:
+            #     print("waiting to go to next arch")
+            #     await asyncio.sleep(0.5)
             # Start the server and wait for client connections
 
             print(f"{Fore.LIGHTBLUE_EX}clear completed_architecture in server loop cause it is 1???? i think so{Fore.RESET}")

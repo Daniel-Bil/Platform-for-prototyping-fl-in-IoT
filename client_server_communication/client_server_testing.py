@@ -6,6 +6,8 @@ def open_terminal_and_run(script_name, data_id=None):
         subprocess.Popen(f'start cmd /k "title {script_name} && python {script_name} -d {data_id}"', shell=True)
     else:
         subprocess.Popen(f'start cmd /k "title {script_name} && python {script_name}"', shell=True)
+
+
 if __name__ == "__main__":
     # Start the server in a new terminal
     print(os.getcwd())
