@@ -14,7 +14,7 @@ class CustomModel(tf.keras.Model):
             quantized_weights_list.append(quantized_weights)
         return quantized_weights_list
 
-    # Simple dequantization (float16)
+    # Simple dequantization (float32)
     def simple_dequantize_floats(self, quantized_weights_list: list):
         dequantized_weights_list = []
         for quantized_weights in quantized_weights_list:

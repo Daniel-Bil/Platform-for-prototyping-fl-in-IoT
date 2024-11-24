@@ -9,16 +9,17 @@ import pandas as pd
 from colorama import Fore
 from sklearn.model_selection import train_test_split
 
-from client_server_communication.converting import weights2list, list2np, simple_quantize_floats, \
-    simple_dequantize_floats, quantize_weights_int, dequantize_weights_int
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Backend.magisterka import recreate_architecture_from_json2
 import tensorflow as tf
 from pathlib import Path
-
-import struct
 from scipy.optimize import linear_sum_assignment
+
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from client_server_communication.communication import send_full_data, receive_full_data
+from client_server_communication.converting import weights2list, list2np, simple_quantize_floats, \
+    simple_dequantize_floats, quantize_weights_int, dequantize_weights_int
+from Backend.magisterka import recreate_architecture_from_json2
 
 lock = asyncio.Lock()
 
@@ -137,41 +138,8 @@ def load_methods():
     # return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox", "fedma"]
     return ["fedavg"]
 
-async def send_full_data(writer, data):
-    data = data.encode()
 
-    writer.write(struct.pack('!I', len(data)))  # '!I' means big-endian unsigned int
-    await writer.drain()
-
-    writer.write(data)
-    await writer.drain()
-
-    print("First 30 bytes = ", data[:30])
-    print("Last 30 bytes = ", data[-30:])
-
-async def receive_full_data(reader, buffer_size=1024):
-    data = b''
-    test = 0
-    while True:
-        part = await reader.read(buffer_size)
-        data += part
-        test+=1
-        if len(part) < buffer_size:
-            break
-
-    # Print the first 30 bytes
-    print(test)
-    print("First 30 bytes = ", data[:30])
-
-    # Print the last 30 bytes
-    print("Last 30 bytes = ", data[-30:])
-
-    return data.decode()
-
-
-
-
-async def test1(shared_state):
+async def start_lock(shared_state):
     while shared_state['global_weights'] is None:
         print(f"{Fore.LIGHTMAGENTA_EX}SHORT W8 FOR GLOBAL WEIGHTS{Fore.RESET}")
         await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
@@ -180,13 +148,11 @@ async def test1(shared_state):
 async def handle_client(reader, writer, shared_state):
     _, client_id = writer.get_extra_info('peername')
     shared_state["client_ids"].append(client_id)
-    # current_architecture_name = shared_state["current_model_name"]
+
     current_architecture_name = None
     print(f"{Fore.CYAN}INFO{writer.get_extra_info('peername')}{Fore.RESET}")
-    #wait untill server performs first action
-    # while shared_state['global_weights'] is None:
-    #     await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
-    await test1(shared_state)
+
+    await start_lock(shared_state)
 
     while True:
 
