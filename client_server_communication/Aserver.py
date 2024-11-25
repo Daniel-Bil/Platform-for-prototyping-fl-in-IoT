@@ -11,8 +11,8 @@ from sklearn.model_selection import train_test_split
 
 import tensorflow as tf
 from pathlib import Path
-from scipy.optimize import linear_sum_assignment
 
+from logic2.Federated_logic.federated_methods_server import aggregate_weights_fedma
 from logic2.utilities import write_to_tensorboard, load_methods, load_architectures
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
