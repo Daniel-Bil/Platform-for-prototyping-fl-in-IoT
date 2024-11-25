@@ -10,6 +10,7 @@ import pandas as pd
 from colorama import Fore
 from sklearn.model_selection import train_test_split
 
+from logic2.utilities import write_to_tensorboard, load_architectures
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from logic2.weights_operations import weights2list, list2np
@@ -21,85 +22,6 @@ from pathlib import Path
 
 lock = asyncio.Lock()
 
-
-def write_to_tensorboard(history_data, log_dir, start_step=0):
-    # Create a TensorBoard summary writer
-    writer = tf.summary.create_file_writer(log_dir)
-
-    # Use the summary writer to log metrics, incrementing the step for each iteration
-    with writer.as_default():
-        for step, (acc, loss) in enumerate(zip(history_data['accuracy'], history_data['loss']), start=start_step):
-            tf.summary.scalar('accuracy', acc, step=step)
-            tf.summary.scalar('loss', loss, step=step)
-            writer.flush()
-
-def simple_quantize_floats(weights_list: list):
-    quantized_weights_list = []
-    for weight in weights_list:
-        quantized_weights = weight.astype(np.float16)
-        quantized_weights_list.append(quantized_weights)
-    return quantized_weights_list
-
-
-# Simple dequantization (float16)
-def simple_dequantize_floats(quantized_weights_list: list):
-    dequantized_weights_list = []
-    for quantized_weights in quantized_weights_list:
-        dequantized_weights = quantized_weights.astype(np.float32)
-        dequantized_weights_list.append(dequantized_weights)
-    return dequantized_weights_list
-
-
-# Quantize weights to int8 with normalization
-def quantize_weights_int(weights: list) -> tuple[list[np.ndarray], list[dict]]:
-    quantized_weights = []
-    params = []
-    for weight in weights:
-        mean = np.mean(weight)
-        std_dev = np.std(weight)
-
-        # Define clipping thresholds
-        clip_min = mean - 2 * std_dev
-        clip_max = mean + 2 * std_dev
-
-        # Clip data
-        clipped_data = np.clip(weight, clip_min, clip_max)
-        max1 = np.max(clipped_data)
-        min1 = np.min(clipped_data)
-
-        # Normalize and quantize
-        norm_data = 2 * ((clipped_data - min1) / (max1 - min1)) - 1
-        quant_data = np.round(127 * norm_data).astype(np.int8)
-
-        param = {'min': float(min1), 'max': float(max1)}
-        quantized_weights.append(quant_data)
-        params.append(param)
-
-    return quantized_weights, params
-
-
-# Dequantize int8 weights back to float32
-def dequantize_weights_int(quantized_weights: list, params: list[dict]) -> list:
-    dequantized_weights = []
-    for weight, param in zip(quantized_weights, params):
-        dequantized_data = weight.astype(np.float32) / 127
-        denorm_data = (dequantized_data + 1) / 2 * (param["max"] - param["min"]) + param["min"]
-        dequantized_weights.append(denorm_data)
-
-    return dequantized_weights
-
-
-def load_architectures():
-    print("load_architectures")
-    paths = os.listdir(f"{os.getcwd()}\\..\\Backend\\architectureJsons")
-    datas = []
-    for idx, path in enumerate(paths):
-        if idx<4:
-            with open(f"{os.getcwd()}\\..\\Backend\\architectureJsons\\{path}", 'r') as file:
-                data = json.load(file)[0]
-                datas.append({"name": path.split(".")[0], "data": data})
-
-    return datas
 
 def load_methods():
     return ["hierfavg"]
@@ -217,7 +139,7 @@ async def handle_edge_server(reader, writer, shared_state):
                         with evaluation_file.open('w') as f:
                             json.dump({"loss": loss, "accuracy": accuracy}, f)
 
-                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path), start_step=iteration)
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, result_path, start_step=iteration)
 
                     async with lock:
                         print(f"{Fore.LIGHTBLUE_EX}append average with lock{Fore.RESET}")
@@ -315,7 +237,7 @@ async def main(port):
     x_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=42)
 
     # Load architectures and methods
-    loaded_architectures = load_architectures()
+    loaded_architectures = load_architectures(Path("..")/"Backend"/"architectureJsons")
     loaded_methods = load_methods()
 
     # Shared state among all clients

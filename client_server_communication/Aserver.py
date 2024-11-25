@@ -13,6 +13,7 @@ import tensorflow as tf
 from pathlib import Path
 from scipy.optimize import linear_sum_assignment
 
+from logic2.utilities import write_to_tensorboard, load_methods, load_architectures
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -22,121 +23,6 @@ from logic2.weights_operations import weights2list, list2np, simple_quantize_flo
 from Backend.magisterka import recreate_architecture_from_json2
 
 lock = asyncio.Lock()
-
-
-def match_and_average_layer(client_weights, layer_idx):
-    """
-    Match and average neurons across clients for a specific layer.
-
-    Parameters:
-    - client_weights: List of weights from all clients.
-    - layer_idx: Index of the current layer to process.
-
-    Returns:
-    - Averaged weights for the matched neurons for the layer.
-    """
-    # Get the weights of the current layer for all clients
-    layer_weights = [weights[layer_idx] for weights in client_weights]
-
-    # Check if the layer is 1D or 2D
-    if len(layer_weights[0].shape) == 1:  # Handle 1D arrays (like biases)
-        num_neurons = layer_weights[0].shape[0]
-
-        # Initialize the cost matrix for matching neurons across clients
-        cost_matrix = np.zeros((num_neurons, num_neurons))
-
-        # Fill the cost matrix by calculating the distance between neurons across clients
-        for i in range(num_neurons):
-            for j in range(num_neurons):
-                # Calculate distance between the first client's neuron and the others
-                cost_matrix[i, j] = np.linalg.norm(layer_weights[0][i] - layer_weights[1][j])
-
-    else:  # Handle 2D arrays (like weights in Dense layers)
-        num_neurons = layer_weights[0].shape[-1]
-
-        # Initialize the cost matrix for matching neurons across clients
-        cost_matrix = np.zeros((num_neurons, num_neurons))
-
-        # Fill the cost matrix by calculating the distance between neurons across clients
-        for i in range(num_neurons):
-            for j in range(num_neurons):
-                # Calculate distance between the first client's neuron and the others
-                cost_matrix[i, j] = np.linalg.norm(layer_weights[0][:, i] - layer_weights[1][:, j])
-
-    # Use Hungarian algorithm (linear sum assignment) to match neurons/channels
-    row_ind, col_ind = linear_sum_assignment(cost_matrix)
-
-    # Create an array to store the averaged neurons after matching
-    averaged_layer_weights = np.zeros_like(layer_weights[0])
-
-    # Perform the matching and averaging across all clients
-    if len(layer_weights[0].shape) == 1:  # For 1D layers
-        for i, j in zip(row_ind, col_ind):
-            averaged_layer_weights[i] = np.mean([client_weights[c][layer_idx][j] for c in range(len(client_weights))],
-                                                axis=0)
-    else:  # For 2D layers
-        for i, j in zip(row_ind, col_ind):
-            averaged_layer_weights[:, i] = np.mean(
-                [client_weights[c][layer_idx][:, j] for c in range(len(client_weights))], axis=0)
-
-    return averaged_layer_weights
-
-
-def aggregate_weights_fedma(client_weights):
-    """
-    Aggregate model weights from different clients using neuron matching and averaging.
-
-    Parameters:
-    - client_weights: List of weights from all clients [weights1, weights2, ..., N].
-
-    Returns:
-    - Global weights after aggregation.
-    """
-    # Number of layers in the model (assuming all clients have the same architecture)
-    num_layers = len(client_weights[0])
-
-    # Initialize list to hold the global model's aggregated weights
-    global_weights = []
-
-    # Loop through each layer and match/average neurons across clients
-    for layer_idx in range(num_layers):
-        # Match and average the neurons for this layer
-        averaged_layer = match_and_average_layer(client_weights, layer_idx)
-        global_weights.append(averaged_layer)
-
-    return global_weights
-
-
-def write_to_tensorboard(history_data, log_dir, start_step=0):
-    # Create a TensorBoard summary writer
-    writer = tf.summary.create_file_writer(log_dir)
-
-    # Use the summary writer to log metrics, incrementing the step for each iteration
-    with writer.as_default():
-        for step, (acc, loss) in enumerate(zip(history_data['accuracy'], history_data['loss']), start=start_step):
-            tf.summary.scalar('accuracy', acc, step=step)
-            tf.summary.scalar('loss', loss, step=step)
-            writer.flush()
-
-
-
-
-def load_architectures():
-    print("load_architectures")
-    paths = os.listdir(f"{os.getcwd()}\\..\\Backend\\architectureJsons")
-    datas = []
-    for idx, path in enumerate(paths):
-        if idx<2:
-            with open(f"{os.getcwd()}\\..\\Backend\\architectureJsons\\{path}", 'r') as file:
-                data = json.load(file)[0]
-                datas.append({"name": path.split(".")[0], "data": data})
-
-    return datas
-
-def load_methods():
-    # return ["fedpaq_int", "fedpaq_float", "fedavg", "fedprox"]
-    # return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox", "fedma"]
-    return ["fedavg"]
 
 
 async def start_lock(shared_state):
@@ -209,17 +95,6 @@ async def handle_client(reader, writer, shared_state):
                     # Store received weights for this client
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
 
-                    # async with lock:
-                    #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                    #     RESULTS_DIR = "results"
-                    #     result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                    #     os.makedirs(result_path, exist_ok=True)
-                    #     history_file = os.path.join(result_path, "training_history.json")
-                    #     with open(history_file, 'w') as f:
-                    #         json.dump(received_data_json["summary"], f)
-                    #
-                    #     write_to_tensorboard(received_data_json["summary"], result_path)
-
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
 
@@ -257,7 +132,7 @@ async def handle_client(reader, writer, shared_state):
                         with evaluation_file.open('w') as f:
                             json.dump({"loss": loss, "accuracy": accuracy}, f)
 
-                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path), start_step=iteration)
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, result_path, start_step=iteration)
 
                     async with lock:
                         print(f"{Fore.LIGHTBLUE_EX}append average with lock{Fore.RESET}")
@@ -324,16 +199,6 @@ async def handle_client(reader, writer, shared_state):
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
                     shared_state['errors'][client_id] = received_data_json["error"]
 
-                    # async with lock:
-                    #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                    #     RESULTS_DIR = "results"
-                    #     result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                    #     os.makedirs(result_path, exist_ok=True)
-                    #     history_file = os.path.join(result_path, "training_history.json")
-                    #     with open(history_file, 'w') as f:
-                    #         json.dump(received_data_json["summary"], f)
-                    #
-                    #     write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -379,7 +244,7 @@ async def handle_client(reader, writer, shared_state):
                         with evaluation_file.open('w') as f:
                             json.dump({"loss": loss, "accuracy": accuracy}, f)
 
-                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, result_path,
                                              start_step=iteration)
 
 
@@ -445,7 +310,7 @@ async def handle_client(reader, writer, shared_state):
                     print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
 
                     # Store received weights for this client
-                    shared_state['weights'][client_id] = simple_dequantize_floats(list2np(received_data_json["weights"]))
+                    shared_state['weights'][client_id] = simple_dequantize_floats(received_data_json["weights"])
 
                     # async with lock:
                     #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
@@ -496,7 +361,7 @@ async def handle_client(reader, writer, shared_state):
                         with evaluation_file.open('w') as f:
                             json.dump({"loss": loss, "accuracy": accuracy}, f)
 
-                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, result_path,
                                              start_step=iteration)
 
 
@@ -567,7 +432,7 @@ async def handle_client(reader, writer, shared_state):
                     print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
 
                     # Store received weights for this client
-                    shared_state['weights'][client_id] = dequantize_weights_int(list2np(received_data_json["weights"]), received_data_json["params"])
+                    shared_state['weights'][client_id] = dequantize_weights_int(received_data_json["weights"], received_data_json["params"])
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -607,8 +472,7 @@ async def handle_client(reader, writer, shared_state):
                         with evaluation_file.open('w') as f:
                             json.dump({"loss": loss, "accuracy": accuracy}, f)
 
-                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
-                                             start_step=iteration)
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, result_path, start_step=iteration)
 
 
                     async with lock:
@@ -675,16 +539,6 @@ async def handle_client(reader, writer, shared_state):
                     # Store received weights for this client
                     shared_state['weights'][client_id] = list2np(received_data_json["weights"])
 
-                    # async with lock:
-                    #     print(f"{Fore.LIGHTMAGENTA_EX} Write to results {Fore.RESET}")
-                    #     RESULTS_DIR = "results"
-                    #     result_path = os.path.join(RESULTS_DIR, f"{shared_state['current_model_name']}_{method}_{client_id}")
-                    #     os.makedirs(result_path, exist_ok=True)
-                    #     history_file = os.path.join(result_path, "training_history.json")
-                    #     with open(history_file, 'w') as f:
-                    #         json.dump(received_data_json["summary"], f)
-                    #
-                    #     write_to_tensorboard(received_data_json["summary"], result_path)
 
                     async with lock:
                         shared_state['completed_clients'].append(client_id)
@@ -725,7 +579,7 @@ async def handle_client(reader, writer, shared_state):
                         with evaluation_file.open('w') as f:
                             json.dump({"loss": loss, "accuracy": accuracy}, f)
 
-                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, str(result_path),
+                        write_to_tensorboard({"accuracy": [accuracy], "loss": [loss]}, result_path,
                                              start_step=iteration)
 
 
@@ -829,7 +683,7 @@ async def main():
     x_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=42)
 
     # Load architectures and methods
-    loaded_architectures = load_architectures()
+    loaded_architectures = load_architectures(Path("..")/"Backend"/"architectureJsons")
     loaded_methods = load_methods()
 
     # Shared state among all clients
