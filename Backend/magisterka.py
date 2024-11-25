@@ -11,7 +11,6 @@ import os
 from colorama import Fore
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Backend.custom_model import CustomModel
 
 app = Flask(__name__)
 CORS(app)
@@ -20,19 +19,6 @@ train = [[1, 1, 1, 1, 1],
          [2, 2, 2, 2, 2],
          [3, 3, 3, 3, 3],
          [4, 4, 4, 4, 4]]
-
-
-def testing_generate_model(model, layer):
-    model.add(layer)
-    return model
-
-
-def testing_train_model():
-    raise Exception(NotImplementedError)
-
-
-def testing_evaluate_model():
-    raise Exception(NotImplementedError)
 
 
 def testing_generate_layer(layerType):
@@ -77,7 +63,7 @@ def recreate_architecture_from_json2(data, name=""):
         if isinstance(data[i], list):
             for j in range(len(data[i])):
                 layers.append(recreate_branch(layer, data[i][j]))
-    model = CustomModel(inputs=input_layer, outputs=layer, name=name)
+    model = tf.keras.Model(inputs=input_layer, outputs=layer, name=name)
     return model
 
 
@@ -153,8 +139,6 @@ def get_architecture():
 
         with open(f"architectureJsons\\{received_data['name']}.json", "w") as file:
             json.dump(received_data["architecture"], file, indent=4)
-        from tensorflow.keras import layers, Model
-
 
         return_data = {
             "status": "success",

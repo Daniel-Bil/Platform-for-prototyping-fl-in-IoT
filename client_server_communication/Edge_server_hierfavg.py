@@ -2,14 +2,13 @@ import argparse
 import asyncio
 import json
 import os
-import struct
 import sys
 import numpy as np
 from colorama import Fore
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from client_server_communication.converting import weights2list, list2np
-from communication import send_full_data, receive_full_data
+from logic2.weights_operations import weights2list, list2np
+from logic2.Communication_logic.communication import send_full_data, receive_full_data
 
 lock = asyncio.Lock()
 

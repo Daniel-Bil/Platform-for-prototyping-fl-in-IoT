@@ -16,8 +16,8 @@ from scipy.optimize import linear_sum_assignment
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from client_server_communication.communication import send_full_data, receive_full_data
-from client_server_communication.converting import weights2list, list2np, simple_quantize_floats, \
+from logic2.Communication_logic.communication import send_full_data, receive_full_data
+from logic2.weights_operations import weights2list, list2np, simple_quantize_floats, \
     simple_dequantize_floats, quantize_weights_int, dequantize_weights_int
 from Backend.magisterka import recreate_architecture_from_json2
 

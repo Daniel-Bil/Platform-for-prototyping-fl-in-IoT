@@ -1,25 +1,25 @@
 import numpy as np
 
 
-def simple_quantize_floats(weights_list: list):
-    quantized_weights_list = []
-    for weight in weights_list:
-        quantized_weights = weight.astype(np.float16)
-        quantized_weights_list.append(quantized_weights)
-    return quantized_weights_list
+def weights2list(weights: np.ndarray) -> list:
+    return [w.tolist() for w in weights]
+
+
+def list2np(weights: list) -> np.ndarray:
+    return np.array([np.array(w) for w in weights])
+
+
+def simple_quantize_floats(weights_list: list) -> np.ndarray:
+    return np.array([weight.astype(np.float16) for weight in weights_list])
 
 
 # Simple dequantization (float16)
-def simple_dequantize_floats(quantized_weights_list: list):
-    dequantized_weights_list = []
-    for quantized_weights in quantized_weights_list:
-        dequantized_weights = quantized_weights.astype(np.float32)
-        dequantized_weights_list.append(dequantized_weights)
-    return dequantized_weights_list
+def simple_dequantize_floats(quantized_weights_list: list) -> list:
+    return [quantized_weights.astype(np.float32) for quantized_weights in quantized_weights_list]
 
 
 # Quantize weights to int8 with normalization
-def quantize_weights_int(weights: list) -> tuple[list[np.ndarray], list[dict]]:
+def quantize_weights_int(weights: list) -> tuple[np.ndarray, list[dict]]:
     quantized_weights = []
     params = []
     for weight in weights:
@@ -43,7 +43,7 @@ def quantize_weights_int(weights: list) -> tuple[list[np.ndarray], list[dict]]:
         quantized_weights.append(quant_data)
         params.append(param)
 
-    return quantized_weights, params
+    return np.array(quantized_weights), params
 
 
 # Dequantize int8 weights back to float32
@@ -57,8 +57,3 @@ def dequantize_weights_int(quantized_weights: list, params: list[dict]) -> list:
     return dequantized_weights
 
 
-def weights2list(weights):
-    return [w.tolist() for w in weights]
-
-def list2np(weights):
-    return np.array([np.array(w) for w in weights])
