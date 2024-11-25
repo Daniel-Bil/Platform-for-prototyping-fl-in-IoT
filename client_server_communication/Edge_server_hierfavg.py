@@ -35,8 +35,8 @@ async def wait_for_all_clients_receive_data(shared_state, client_id="placeholde"
     while len(shared_state['completed_receiving_clients']) < shared_state['total_clients']:
         print(f"c waiting {client_id} avg:{shared_state['completed_average_clients']} com:{shared_state['completed_receiving_clients']}")
         await asyncio.sleep(0.1)  # Small delay to avoid busy-waiting
-
-    print(f"{Fore.LIGHTBLUE_EX} all clients received data : completed clients {shared_state['completed_receiving_clients']} {Fore.RESET}")
+    else:
+        print(f"{Fore.LIGHTBLUE_EX} all clients received data : completed clients {shared_state['completed_receiving_clients']} {Fore.RESET}")
 
 
 async def wait_for_all_clients_aggregate_weights(shared_state, client_id="placeholde"):
@@ -248,7 +248,7 @@ async def main(K):
         "main_server_data_received": "no",
         "main_server_data_send": "no",
         "Finished_iterations": False,
-        "main_server_data":None
+        "main_server_data": None
     }
 
     # Start listening for client connections

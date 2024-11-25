@@ -16,8 +16,9 @@ async def send_full_data(writer, data):
     writer.write(data)
     await writer.drain()
 
+
 # Function to receive full data
-async def receive_full_data(reader, buffer_size=1024):
+async def receive_full_data(reader):
     print(f"{Fore.GREEN}receive_full_data{Fore.RESET}")
     try:
         # Read the length of the incoming data (4 bytes for the message length)

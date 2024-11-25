@@ -4,13 +4,13 @@ from flask import Flask, request
 import flask
 from flask_cors import CORS
 import json
-import tensorflow as tf
-import tensorflow.keras.layers as Layers
 from tensorflow import keras
 import os
-from colorama import Fore
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from logic2.utilities import recreate_architecture_from_json
+
 
 app = Flask(__name__)
 CORS(app)
@@ -19,106 +19,6 @@ train = [[1, 1, 1, 1, 1],
          [2, 2, 2, 2, 2],
          [3, 3, 3, 3, 3],
          [4, 4, 4, 4, 4]]
-
-
-def testing_generate_layer(layerType):
-    """
-    Generate layer from given dictionary
-    """
-    print(f"{Fore.LIGHTGREEN_EX}{layerType['name']}{Fore.RESET}")
-    kwargs = {}
-    for key in list(layerType.keys()):
-        if not (key == "id" or key == "name" or key == "kwargs" or key =="input_shape"):
-            if (layerType[key]["type"] == "tuple"):
-                kwargs[key] = tuple([int(l) for l in layerType[key]["default"]])
-            elif (layerType[key]["type"] == "int"):
-                kwargs[key] = int(layerType[key]["default"])
-            elif (layerType[key]["type"] == "float"):
-                kwargs[key] = float(layerType[key]["default"])
-            else:
-                kwargs[key] = layerType[key]["default"]
-
-    layer = getattr(Layers, f"{layerType['name']}")
-    layer = layer(**kwargs)
-
-    return layer
-
-
-def recreate_architecture_from_json2(data, name=""):
-    print(f"{Fore.BLUE}recreate_architecture_from_json2 {name}{Fore.RESET}")
-    layers = []
-
-    input_layer = tf.keras.layers.Input(shape = eval(data[0]["input_shape"]))
-    layer = testing_generate_layer(data[0])(input_layer)
-    for i in range(len(data)):
-        if i == 0:
-            continue
-        if not isinstance(data[i], list):
-            if not data[i]["name"] == "Concatenate":
-                layer = testing_generate_layer(data[i])(layer)
-            else:
-                layer = tf.keras.layers.Concatenate()(layers)
-                layers = []
-
-        if isinstance(data[i], list):
-            for j in range(len(data[i])):
-                layers.append(recreate_branch(layer, data[i][j]))
-    model = tf.keras.Model(inputs=input_layer, outputs=layer, name=name)
-    return model
-
-
-def recreate_architecture_from_json(path):
-    with open(path, 'r') as file:
-        data = json.load(file)[0]
-    print(data)
-    layers = []
-    # print(Fore.BLUE,type(data),Fore.RESET)
-    # print(data[0]["input_shape"])
-    # print(tuple(data[0]["input_shape"]))
-    input_layer = tf.keras.layers.Input(shape = eval(data[0]["input_shape"]))
-    print(input_layer)
-    layer = testing_generate_layer(data[0])(input_layer)
-    print(layer)
-    for i in range(len(data)):
-        if i == 0:
-            continue
-        print(data[i])
-        if not isinstance(data[i], list):
-            if not data[i]["name"] == "Concatenate":
-                layer = testing_generate_layer(data[i])(layer)
-            else:
-                layer = tf.keras.layers.Concatenate()(layers)
-                layers = []
-
-        if isinstance(data[i], list):
-            for j in range(len(data[i])):
-                layers.append(recreate_branch(layer, data[i][j]))
-    model = tf.keras.Model(inputs=input_layer, outputs=layer)
-
-    # Compile the model
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-    # Print model summary
-    model.summary()
-
-def recreate_branch(parent_layer, rest_of_data):
-    if len(rest_of_data) == 0:
-        return parent_layer
-    layers = []
-    layer = parent_layer
-    for z in range(len(rest_of_data)):
-        if not isinstance(rest_of_data[z], list):
-            if not rest_of_data[z]["name"] == "Concatenate":
-                layer = testing_generate_layer(rest_of_data[z])(layer)
-            else:
-                layer = tf.keras.layers.Concatenate()(layers)
-                layers = []
-
-        if isinstance(rest_of_data[z], list):
-            for j in range(len(rest_of_data[z])):
-                layers.append(recreate_branch(layer, rest_of_data[z][j]))
-    return layer
-
 
 @app.route("/create", methods=['POST'])
 def create():

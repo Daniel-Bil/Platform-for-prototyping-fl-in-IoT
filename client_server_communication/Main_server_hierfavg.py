@@ -10,13 +10,12 @@ import pandas as pd
 from colorama import Fore
 from sklearn.model_selection import train_test_split
 
-from logic2.utilities import write_to_tensorboard, load_architectures
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from logic2.utilities import write_to_tensorboard, load_architectures, recreate_architecture_from_json2
 from logic2.weights_operations import weights2list, list2np
 from logic2.Communication_logic.communication import receive_full_data, send_full_data
 
-from Backend.magisterka import recreate_architecture_from_json2
 import tensorflow as tf
 from pathlib import Path
 

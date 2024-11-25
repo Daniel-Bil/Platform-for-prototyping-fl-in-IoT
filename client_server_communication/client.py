@@ -1,5 +1,4 @@
 import os
-import random
 import socket
 import json
 import sys
@@ -13,12 +12,13 @@ import numpy as np
 from colorama import Fore
 from sklearn.model_selection import train_test_split
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from logic2.Federated_logic.federated_methods_client import simple_training, fedProx_training, fedPaq_int_training, \
     fedPaq_float_training
+from logic2.utilities import recreate_architecture_from_json2
 from logic2.weights_operations import weights2list, quantize_weights_int, simple_quantize_floats
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Backend.magisterka import recreate_architecture_from_json2
 
 
 def read_csv_by_index(directory, index):
@@ -73,43 +73,51 @@ def create_dataset(df, window_size=5):
     return data, labels
 
 
-def send_full_data(sock, data, buffer_size=1024):
-    # If the data is a string, encode it to bytes
+def send_full_data(writer, data):
+    print(f"{Fore.GREEN}send_full_data{Fore.RESET}")
+    print("sFirst 40 bytes = ", data[:40])
+    print("sLast 40 bytes = ", data[-40:])
     data = data.encode()
 
-    # Send the data in chunks
-    total_sent = 0
-    while total_sent < len(data):
-        # Send a chunk of data up to buffer_size
-        sent = sock.send(data[total_sent:total_sent + buffer_size])
-        if sent == 0:
-            raise RuntimeError("Socket connection broken")
+    # Write the length of the data (4 bytes for the message length)
+    writer.sendall(struct.pack('!I', len(data)))  # '!I' means big-endian unsigned int
 
-        # Update the total amount of data sent
-        total_sent += sent
+    # Write the actual data
+    writer.sendall(data)
 
-def receive_full_data(sock, buffer_size=1024):
-    data = b''  # Start with empty byte string to accumulate the data
-    test = 0
+# Function to receive full data
+def receive_full_data(reader):
+    print(f"{Fore.GREEN}receive_full_data{Fore.RESET}")
+    try:
+        # Read the length of the incoming data (4 bytes for the message length)
+        raw_msglen = reader.recv(4)
+        if not raw_msglen:
+            print("Received no data for message length.")
+            return None
+    except Exception as e:
+        print(f"{Fore.RED}Error reading message length: {e}{Fore.RESET}")
+        return None
 
-    raw_msglen = sock.recv(4)
-    if not raw_msglen:
-        raise ValueError("Failed to receive data length.")
+    # Unpack the length of the message
     msglen = struct.unpack('!I', raw_msglen)[0]
-    print(f"I the client will receive {msglen} bytes or something ;p")
-    data = b''
-    while len(data) < msglen:
-        part = sock.recv(buffer_size)
-        print(f"acquired part of length = {len(part)}")
-        if not part:
-            if len(data) < msglen:
-                print(f"{Fore.LIGHTRED_EX}INCOMPLETE TRANSMISION {len(data)} < {msglen} {Fore.RESET}")
-            break
-        data += part
+    print(f"{Fore.LIGHTBLUE_EX}Expecting to receive {msglen} bytes{Fore.RESET}")
 
-    # Print the first and last 30 bytes for debugging
-    print("First 30 bytes = ", data[:30])
-    print("Last 30 bytes = ", data[-30:])
+    try:
+        # Read the exact message length
+        data = b""
+        while len(data) < msglen:
+            part = reader.recv(msglen - len(data))
+            if not part:
+                print(f"{Fore.RED}Connection closed before receiving the full message.{Fore.RESET}")
+                return None
+            data += part
+    except Exception as e:
+        print(f"{Fore.RED}Error reading message: {e}{Fore.RESET}")
+        return None
+
+    # Print the first and last 40 bytes for debugging
+    print("rFirst 40 bytes = ", data[:40])
+    print("rLast 40 bytes = ", data[-40:])
 
     return data.decode()
 
