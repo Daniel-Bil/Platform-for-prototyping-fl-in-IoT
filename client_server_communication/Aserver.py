@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from logic2.Asyncio_waiters.Edge_server_waiters import wait_for_all_clients_receive_data, \
-    wait_for_all_clients_aggregate_weights, wait_for_completed_removal_aggregation
+    wait_for_all_clients_aggregate_weights, wait_for_completed_removal_aggregation, wait_for_completed_removal_receive
 
 from logic2.Federated_logic.federated_methods_server import aggregate_weights_fedma
 
@@ -217,10 +217,7 @@ async def handle_client(reader, writer, shared_state):
                     shared_state['completed_receiving_clients'].remove(client_id)
                     print(f"{Fore.LIGHTWHITE_EX} Removed {client_id} -> {shared_state['completed_receiving_clients']} completed_receiving_clients")
 
-                #TODO come up with name for this waiter
-                while len(shared_state['completed_receiving_clients']) > 0:
-                    print(f"waiting {client_id} for others to remove itself com:{shared_state['completed_receiving_clients']}")
-                    await asyncio.sleep(0.1)
+                await wait_for_completed_removal_receive(shared_state, client_id)
 
                 async with lock:
                     shared_state['completed_average_clients'].remove(client_id)
