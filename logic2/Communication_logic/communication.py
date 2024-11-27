@@ -4,13 +4,17 @@ import struct
 from colorama import Fore
 
 
-async def send_full_data(writer, data):
+async def send_full_data(writer, data, client_id=""):
     print(f"{Fore.GREEN}send_full_data{Fore.RESET}")
     print("sFirst 40 bytes = ", data[:40])
     print("sLast 40 bytes = ", data[-40:])
     data = data.encode()
 
+    # Unpack the length of the message
+    print(f"{Fore.LIGHTBLUE_EX}c_id[{client_id}] Expecting to send {len(data)} bytes{Fore.RESET}")
+
     writer.write(struct.pack('!I', len(data)))  # '!I' means big-endian unsigned int
+
     await writer.drain()
 
     writer.write(data)
@@ -18,7 +22,7 @@ async def send_full_data(writer, data):
 
 
 # Function to receive full data
-async def receive_full_data(reader):
+async def receive_full_data(reader, client_id=''):
     print(f"{Fore.GREEN}receive_full_data{Fore.RESET}")
     try:
         # Read the length of the incoming data (4 bytes for the message length)
@@ -33,7 +37,7 @@ async def receive_full_data(reader):
 
     # Unpack the length of the message
     msglen = struct.unpack('!I', raw_msglen)[0]
-    print(f"{Fore.LIGHTBLUE_EX}Expecting to receive {msglen} bytes{Fore.RESET}")
+    print(f"{Fore.LIGHTBLUE_EX}c_id[{client_id}] Expecting to receive {msglen} bytes{Fore.RESET}")
 
     try:
         # Read the exact message length

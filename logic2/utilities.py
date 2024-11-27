@@ -50,10 +50,13 @@ def testing_generate_layer(layerType):
         if not (key == "id" or key == "name" or key == "kwargs" or key =="input_shape"):
             if (layerType[key]["type"] == "tuple"):
                 kwargs[key] = tuple([int(l) for l in layerType[key]["default"]])
+
             elif (layerType[key]["type"] == "int"):
                 kwargs[key] = int(layerType[key]["default"])
+
             elif (layerType[key]["type"] == "float"):
                 kwargs[key] = float(layerType[key]["default"])
+
             else:
                 kwargs[key] = layerType[key]["default"]
 
@@ -91,9 +94,6 @@ def recreate_architecture_from_json(path: str):
         data = json.load(file)[0]
     print(data)
     layers = []
-    # print(Fore.BLUE,type(data),Fore.RESET)
-    # print(data[0]["input_shape"])
-    # print(tuple(data[0]["input_shape"]))
     input_layer = tf.keras.layers.Input(shape = eval(data[0]["input_shape"]))
     print(input_layer)
     layer = testing_generate_layer(data[0])(input_layer)

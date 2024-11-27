@@ -105,14 +105,27 @@ async def handle_client(reader, writer, shared_state):
                     else:
                         data_to_send["weights"] = weights2list(simple_quantize_floats(shared_state['averaged_weights']))
 
+                suma = 0
+                for id_test, w in enumerate(data_to_send["weights"]):
+                    if (id_test == 0) or (id_test == len(data_to_send["weights"]) - 1):
+                        print(f"s {Fore.LIGHTCYAN_EX}{id_test} weights = {json.dumps(data_to_send['weights'][id_test])[:100]}{Fore.RESET}")
+                    suma += 1
+                print(f"{Fore.MAGENTA} number of weights to send = {suma}{Fore.RESET}")
 
                 data_to_send_json_string = json.dumps(data_to_send)
-                await send_full_data(writer, data_to_send_json_string)
+                await send_full_data(writer, data_to_send_json_string, client_id)
 
                 # Wait for the client's updated weights
-                received_data_json_string = await receive_full_data(reader)
+                received_data_json_string = await receive_full_data(reader, client_id)
                 received_data_dict = json.loads(received_data_json_string)
                 print(f"{Fore.LIGHTGREEN_EX}Received updated weights and history from client {client_id}{Fore.RESET}")
+
+                suma = 0
+                for id_test, w in enumerate(received_data_dict["weights"]):
+                    if (id_test == 0) or (id_test == len(received_data_dict["weights"]) - 1):
+                        print(f"r {Fore.LIGHTCYAN_EX}{id_test} weights = {json.dumps(received_data_dict['weights'][id_test])[:100]}{Fore.RESET}")
+                    suma += 1
+                print(f"{Fore.MAGENTA} number of weights to received = {suma}{Fore.RESET}")
 
                 # Unpack received data correctly
                 if (method == "fedavg"):

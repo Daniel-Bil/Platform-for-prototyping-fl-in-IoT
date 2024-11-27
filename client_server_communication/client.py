@@ -73,13 +73,14 @@ def create_dataset(df, window_size=5):
     return data, labels
 
 
-def send_full_data(writer, data):
+def send_full_data(writer, data) -> None:
     print(f"{Fore.GREEN}send_full_data{Fore.RESET}")
     print("sFirst 40 bytes = ", data[:40])
     print("sLast 40 bytes = ", data[-40:])
     data = data.encode()
 
     # Write the length of the data (4 bytes for the message length)
+    print(f"{Fore.LIGHTBLUE_EX}Expecting to send {len(data)} bytes{Fore.RESET}")
     writer.sendall(struct.pack('!I', len(data)))  # '!I' means big-endian unsigned int
 
     # Write the actual data
@@ -150,13 +151,21 @@ def main():
         model = None
 
         while True:
-
+            print()
             # Receive weights from server
             print(f"{Fore.YELLOW}Receive data{Fore.RESET}")
             received_data = receive_full_data(sock)
 
             data = json.loads(received_data)
             print(f"{Fore.LIGHTCYAN_EX}Received data from server:{data['id']} {data['name']} {data['method']} {data['header']}{Fore.RESET}")
+
+            suma = 0
+            for id_test, w in enumerate(data["weights"]):
+                if (id_test == 0) or (id_test == len(data["weights"])-1):
+                    print(f"r {id_test} weights = {json.dumps(data['weights'][id_test])[:100]}")
+                suma += 1
+            print(f"{Fore.MAGENTA} number of weights to received = {suma}{Fore.RESET}")
+
             if data["header"] == "3":
                 print(f"{Fore.LIGHTRED_EX} CLOSE CLIENT{Fore.RESET}")
                 break
@@ -165,37 +174,36 @@ def main():
                 model = build_model(data)
 
             if (data["method"] == "fedavg") or (data["method"] == "fedma"):
-                history = simple_training(model, data, x_train, y_train)
 
-                data_to_send = json.dumps({"weights": weights2list(model.get_weights()),
-                                           "summary": history.history})
+                data_to_send = {"weights": weights2list(model.get_weights())}
+
 
 
             if data["method"] == "fedprox":
-                history, error = fedProx_training(model, data, train_dataset)
-                data_to_send = json.dumps({"weights": weights2list(model.get_weights()),
-                                           "summary": history,
-                                           "error": error})
+                _, error = fedProx_training(model, data, train_dataset)
+                data_to_send = {"weights": weights2list(model.get_weights()),
+                                           "error": error}
 
 
             if data["method"] == "fedpaq_float":
-                history = fedPaq_float_training(model, data, x_train, y_train)
-
-                data_to_send = json.dumps({"weights": weights2list(simple_quantize_floats(model.get_weights())),
-                                           "summary": history.history})
+                data_to_send = {"weights": weights2list(simple_quantize_floats(model.get_weights()))}
 
 
             if data["method"] == "fedpaq_int":
-                history = fedPaq_int_training(model, data, x_train, y_train)
-
                 q_weights, params = quantize_weights_int(model.get_weights())
 
-                data_to_send = json.dumps({"weights": weights2list(q_weights),
-                                           "params": params,
-                                           "summary": history.history})
+                data_to_send = {"weights": weights2list(q_weights), "params": params}
 
+            data_to_send_json_string = json.dumps(data_to_send)
 
-            send_full_data(sock, data_to_send)
+            suma = 0
+            for id_test, w in enumerate(data["weights"]):
+                if (id_test == 0) or (id_test == len(data["weights"])-1):
+                    print(f"s {id_test} weights = {json.dumps(data_to_send['weights'][id_test])[:100]}")
+                suma += 1
+            print(f"{Fore.MAGENTA} number of weights to send = {suma}{Fore.RESET}")
+
+            send_full_data(sock, data_to_send_json_string)
             print("Sent updated weights + history to server")
 
 
