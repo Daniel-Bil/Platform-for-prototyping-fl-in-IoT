@@ -1,4 +1,5 @@
 import numpy as np
+from colorama import Fore
 
 
 def weights2list(weights: np.ndarray) -> list:
@@ -6,6 +7,14 @@ def weights2list(weights: np.ndarray) -> list:
 
 
 def list2np(weights: list) -> np.ndarray:
+    print()
+    print(Fore.LIGHTWHITE_EX)
+    for i, w1 in enumerate(weights):
+        try:
+            print(f"Element {i}: Type={type(w1)}, Shape={np.array(w1).shape}")
+        except Exception as e:
+            print(f"Element {i}: Error converting to NumPy array -> {e}")
+    print(Fore.RESET)
     return np.array([np.array(w) for w in weights])
 
 

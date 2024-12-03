@@ -8,7 +8,7 @@ async def send_full_data(writer, data, client_id=""):
     print(f"{Fore.GREEN}send_full_data{Fore.RESET}")
     print("sFirst 40 bytes = ", data[:40])
     print("sLast 40 bytes = ", data[-40:])
-    data = data.encode()
+    data = data.encode("utf-8")
 
     # Unpack the length of the message
     print(f"{Fore.LIGHTBLUE_EX}c_id[{client_id}] Expecting to send {len(data)} bytes{Fore.RESET}")
@@ -50,4 +50,4 @@ async def receive_full_data(reader, client_id=''):
     print("rFirst 40 bytes = ", data[:40])
     print("rLast 40 bytes = ", data[-40:])
     print(f"{Fore.LIGHTBLUE_EX}c_id[{client_id}] Received {len(data)} bytes{Fore.RESET}")
-    return data.decode()
+    return data.decode("utf-8")

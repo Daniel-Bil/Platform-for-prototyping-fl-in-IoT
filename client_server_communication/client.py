@@ -77,7 +77,7 @@ def send_full_data(writer, data) -> None:
     print(f"{Fore.GREEN}send_full_data{Fore.RESET}")
     print("sFirst 40 bytes = ", data[:40])
     print("sLast 40 bytes = ", data[-40:])
-    data = data.encode()
+    data = data.encode("utf-8")
 
     # Write the length of the data (4 bytes for the message length)
     print(f"{Fore.LIGHTBLUE_EX}Expecting to send {len(data)} bytes{Fore.RESET}")
