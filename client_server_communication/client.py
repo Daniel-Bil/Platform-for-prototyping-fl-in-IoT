@@ -9,6 +9,7 @@ import tensorflow as tf
 import argparse
 
 import numpy as np
+from pathlib import Path
 from colorama import Fore
 from sklearn.model_selection import train_test_split
 
@@ -16,30 +17,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from logic2.Federated_logic.federated_methods_client import simple_training, fedProx_training, fedPaq_int_training, \
     fedPaq_float_training
-from logic2.utilities import recreate_architecture_from_json2
+from logic2.utilities import recreate_architecture_from_json2, read_csv_by_index
 from logic2.weights_operations import weights2list, quantize_weights_int, simple_quantize_floats
 
-
-
-def read_csv_by_index(directory, index):
-    # Get a list of all CSV files in the directory
-    csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
-
-    # Check if the provided index is within the range
-    if index < 0 or index >= len(csv_files):
-        raise IndexError("Index out of range. Please provide a valid index.")
-
-    # Get the filename at the specified index
-    selected_file = csv_files[index]
-
-    # Create full file path
-    file_path = os.path.join(directory, selected_file)
-
-    # Read the CSV file
-    df = pd.read_csv(file_path)
-    print(f"Loaded file: {selected_file}")
-
-    return df
 
 
 def create_dataset(df, window_size=5):
@@ -140,7 +120,7 @@ def main():
     print(f"data index = {args.data_id}")
 
     print("load data")
-    loaded_data = read_csv_by_index("..\\dane\\generated_data", args.data_id)
+    loaded_data = read_csv_by_index(Path("..")/"dane"/"generated_data", args.data_id)
     data, labels = create_dataset(loaded_data)
     x_train, x_test, y_train, y_test = train_test_split(data, labels, test_size=0.2, random_state=42)
 
