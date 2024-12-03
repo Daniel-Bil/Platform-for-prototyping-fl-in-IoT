@@ -49,5 +49,5 @@ async def receive_full_data(reader, client_id=''):
     # Print the first and last 30 bytes for debugging
     print("rFirst 40 bytes = ", data[:40])
     print("rLast 40 bytes = ", data[-40:])
-
+    print(f"{Fore.LIGHTBLUE_EX}c_id[{client_id}] Received {len(data)} bytes{Fore.RESET}")
     return data.decode()

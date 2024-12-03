@@ -88,7 +88,7 @@ def send_full_data(writer, data) -> None:
 
 # Function to receive full data
 def receive_full_data(reader):
-    print(f"{Fore.GREEN}receive_full_data{Fore.RESET}")
+    print(f"{Fore.GREEN}receive_full_data client{Fore.RESET}")
     try:
         # Read the length of the incoming data (4 bytes for the message length)
         raw_msglen = reader.recv(4)
@@ -119,12 +119,12 @@ def receive_full_data(reader):
     # Print the first and last 40 bytes for debugging
     print("rFirst 40 bytes = ", data[:40])
     print("rLast 40 bytes = ", data[-40:])
-
+    print(f"{Fore.LIGHTBLUE_EX}Received {len(data)} bytes{Fore.RESET}")
     return data.decode()
 
 
 def build_model(data):
-    print("function1")
+    print("build_model")
     model = recreate_architecture_from_json2(data["data"]["data"], data["data"]["name"])
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[tf.keras.metrics.BinaryAccuracy(name='accuracy'),
                                                         tf.keras.metrics.Precision(name='precision'),
@@ -159,6 +159,10 @@ def main():
             data = json.loads(received_data)
             print(f"{Fore.LIGHTCYAN_EX}Received data from server:{data['id']} {data['name']} {data['method']} {data['header']}{Fore.RESET}")
 
+            if data["header"] == "3":
+                print(f"{Fore.LIGHTRED_EX} CLOSE CLIENT{Fore.RESET}")
+                break
+
             suma = 0
             for id_test, w in enumerate(data["weights"]):
                 if (id_test == 0) or (id_test == len(data["weights"])-1):
@@ -166,15 +170,11 @@ def main():
                 suma += 1
             print(f"{Fore.MAGENTA} number of weights to received = {suma}{Fore.RESET}")
 
-            if data["header"] == "3":
-                print(f"{Fore.LIGHTRED_EX} CLOSE CLIENT{Fore.RESET}")
-                break
-
             if data["header"] == "1":
                 model = build_model(data)
 
             if (data["method"] == "fedavg") or (data["method"] == "fedma"):
-
+                _ = simple_training(model=model, data=data, X_train=x_train, Y_train=y_train)
                 data_to_send = {"weights": weights2list(model.get_weights())}
 
 
@@ -186,10 +186,13 @@ def main():
 
 
             if data["method"] == "fedpaq_float":
+                fedPaq_float_training(model=model, data=data, X_train=x_train, Y_train=y_train)
                 data_to_send = {"weights": weights2list(simple_quantize_floats(model.get_weights()))}
 
 
             if data["method"] == "fedpaq_int":
+                fedPaq_int_training(model=model, data=data, X_train=x_train, Y_train=y_train)
+
                 q_weights, params = quantize_weights_int(model.get_weights())
 
                 data_to_send = {"weights": weights2list(q_weights), "params": params}
