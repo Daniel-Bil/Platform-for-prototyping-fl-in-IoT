@@ -6,7 +6,7 @@ def weights2list(weights: np.ndarray) -> list:
     return [w.tolist() for w in weights]
 
 
-def list2np(weights: list) -> np.ndarray:
+def list2np(weights: list) -> list[np.ndarray]:
     print()
     print(Fore.LIGHTWHITE_EX)
     for i, w1 in enumerate(weights):
@@ -15,7 +15,7 @@ def list2np(weights: list) -> np.ndarray:
         except Exception as e:
             print(f"Element {i}: Error converting to NumPy array -> {e}")
     print(Fore.RESET)
-    return np.array([np.array(w) for w in weights])
+    return [np.array(w) for w in weights]
 
 
 def simple_quantize_floats(weights_list: list) -> np.ndarray:

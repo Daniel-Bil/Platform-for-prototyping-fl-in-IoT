@@ -24,8 +24,8 @@ def load_architectures(path: Path) -> list:
 
 def load_methods():
     # return ["fedpaq_int", "fedpaq_float", "fedavg", "fedprox"]
-    # return ["fedpaq_int", "fedavg", "fedpaq_float", "fedprox", "fedma"]
-    return ["fedavg"]
+    return ["fedavg", "fedpaq_int", "fedpaq_float", "fedprox", "fedma"]
+    # return ["fedavg"]
 
 
 def write_to_tensorboard(history_data: dict, log_dir: Path, start_step: int = 0):

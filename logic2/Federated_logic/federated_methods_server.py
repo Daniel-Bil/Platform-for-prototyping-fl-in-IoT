@@ -59,7 +59,7 @@ def match_and_average_layer(client_weights, layer_idx):
 
     return averaged_layer_weights
 
-def aggregate_weights_fedma(client_weights):
+def aggregate_weights_fedma(client_weights: list) -> list:
     """
     Aggregate model weights from different clients using neuron matching and averaging.
 

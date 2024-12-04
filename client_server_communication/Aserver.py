@@ -173,7 +173,10 @@ async def handle_client(reader, writer, shared_state):
                     if (method == "fedavg"):
                         for client_id2 in shared_state['completed_receiving_clients']:
                             weights.append(list2np(shared_state['weights'][client_id2]))
-                        shared_state['averaged_weights'] = np.mean(weights, axis=0)
+
+                        layer_wise_weights = list(zip(*weights))
+                        averaged_weights = [np.mean(layer, axis=0) for layer in layer_wise_weights]
+                        shared_state['averaged_weights'] = averaged_weights
 
                     if (method == "fedprox"):
                         errors = []
@@ -182,24 +185,41 @@ async def handle_client(reader, writer, shared_state):
                                                     shared_state['weights'][client_id2]]
                             weights.append(error_scaled_wieghts)
                             errors.append(shared_state["errors"][client_id2])
-                        avg_weights = np.sum(weights, axis=0) / sum(errors)
+
+                        layer_wise_weights = list(zip(*weights))
+                        #TODO fix
+                        # avg_weights = np.sum(weights, axis=0) / sum(errors)
+                        avg_weights = [
+                            np.sum(layers, axis=0) / sum(errors)
+                            for layers in layer_wise_weights
+                        ]
                         shared_state['averaged_weights'] = avg_weights
 
                     if (method == "fedma"):
                         for client_id2 in shared_state['completed_receiving_clients']:
                             weights.append(list2np(shared_state['weights'][client_id2]))
-
+                        # TODO fix
                         shared_state['averaged_weights'] = aggregate_weights_fedma(weights)
 
                     if method == "fedpaq_int":
+                        # TODO fix
                         for client_id2 in shared_state['completed_receiving_clients']:
                             weights.append(list2np(shared_state['weights'][client_id2]))
-                        shared_state['averaged_weights'] = np.mean(weights, axis=0)
+
+                        layer_wise_weights = list(zip(*weights))
+                        averaged_weights = [np.mean(layer, axis=0) for layer in layer_wise_weights]
+
+                        shared_state['averaged_weights'] = averaged_weights
 
                     if method == "fedpaq_float":
+                        # TODO fix
                         for client_id2 in shared_state['completed_receiving_clients']:
                             weights.append(shared_state['weights'][client_id2])
-                        shared_state['averaged_weights'] = np.mean(weights, axis=0)
+
+                        layer_wise_weights = list(zip(*weights))
+                        averaged_weights = [np.mean(layer, axis=0) for layer in layer_wise_weights]
+
+                        shared_state['averaged_weights'] = averaged_weights
 
                     print(f"{Fore.LIGHTCYAN_EX}averaging done {client_id}{Fore.RESET}")
 
