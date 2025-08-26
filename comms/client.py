@@ -251,7 +251,7 @@ def main():
     batch_size = len(x_train)//10
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.connect(('localhost', 8090))  # Connect to the server
+        sock.connect(('192.168.2.147', 8090))  # Connect to the server
         model = None
 
         while True:
