@@ -13,7 +13,7 @@ if __name__ == "__main__":
     print(os.getcwd())
     print("Starting server...")
     # open_terminal_and_run("server.py")
-    open_terminal_and_run("Aserver.py")
+    open_terminal_and_run("server.py")
 
     # Give the server some time to start up
     time.sleep(3)

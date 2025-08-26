@@ -4,6 +4,11 @@ from logic.dataProcesing import find_interrupts_withTime
 
 
 class BetterDataClass:
+
+    # initializes the container that:
+    #   - stores original data (self.iot) and dict view (self.iot_dict)
+    #   - computes series length, finds time-based interruptions,
+    #   - initializes output holders: self.samples and self.labels
     def __init__(self, data, name: str=""):
         self.name = name
         self.iot = data.copy(deep=True)
