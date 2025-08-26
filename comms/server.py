@@ -884,7 +884,7 @@ async def main():
         "test_data_x": X_test,
         "test_data_y": y_test
     }
-    server = await asyncio.start_server(lambda r, w: handle_client(r, w, shared_state), 'localhost', 8090)
+    server = await asyncio.start_server(lambda r, w: handle_client(r, w, shared_state), '192.168.2.147', 8090)
     print("async with server")
     async with server:
         # Loop over each architecture, train, and distribute
