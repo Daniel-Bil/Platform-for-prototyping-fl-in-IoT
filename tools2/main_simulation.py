@@ -1,3 +1,32 @@
+"""
+========================================================================================
+SIMULATION ENGINE: FEDERATED LEARNING (FL) IN DISTRIBUTED IOT NETWORKS
+========================================================================================
+Temat pracy: Analiza i porównanie algorytmów uczenia federacyjnego w systemach IoT
+             z uwzględnieniem kosztów telekomunikacyjnych i wydajności detekcji anomalii.
+
+OPIS MODUŁU:
+    Skrypt stanowi główny silnik symulacyjny środowiska badawczego. Realizuje uczenie
+    rozproszone w sieci 7 niejednorodnych węzłów IoT (czujników rolniczych/środowiskowych
+    charakteryzujących się rozkładem Non-IID). Skrypt automatycznie wczytuje architekturę
+    sieci neuronowej wyeksportowaną do pliku JSON z interfejsu graficznego (FL Prototyper)
+    i dostosowuje ją do analizy jednowymiarowych szeregów czasowych (Conv1D/LSTM/MLP).
+
+BADANE ALGORYTMY FEDERACYJNE:
+    1. FedAvg     - Klasyczne uśrednianie wag (Baseline FL).
+    2. FedProx    - Regularyzacja proksymalna zapobiegająca dryftowi w środowiskach Non-IID.
+    3. FedMA      - Federated Matched Averaging (dopasowanie neuronów algorytmem węgierskim).
+    4. FedPAQ     - Kwantyzacja wag do 8 bitów w celu redukcji obciążenia łącza.
+    5. HierFedAvg - Hierarchiczna agregacja dwupoziomowa (Edge Servers -> Cloud Server).
+
+MIERZONE METRYKI BADAWCZE (ML + SYSTEMOWE):
+    * F1-Score (Anomaly)  - Zdolność modelu do precyzyjnego wykrywania awarii/anomalii.
+    * Total Data (MB)     - Całkowity wolumen danych przesłanych przez sieć w obu kierunkach.
+    * Client Latency (s)  - Czas obliczeń lokalnych (trening epok) na urządzeniach brzegowych.
+    * Server Latency (s)  - Czas wykonania algorytmu agregacji na serwerze (np. koszt FedMA).
+========================================================================================
+"""
+
 import os
 import glob
 import time
