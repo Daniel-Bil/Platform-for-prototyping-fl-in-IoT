@@ -89,9 +89,26 @@ def read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def comparison_row(run_dir: Path, repetition: int, requested_clients: int) -> dict[str, Any]:
+def comparison_row(
+    run_dir: Path,
+    repetition: int,
+    requested_clients: int,
+    requested_rounds: int,
+) -> dict[str, Any]:
     summary = read_json(run_dir / "summary.json")
     config = read_json(run_dir / "config.json")
+
+    status = summary.get("status", "completed")
+    if status != "completed":
+        raise RuntimeError(
+            f"experiment result is marked {status!r}: {summary.get('failure_reason')} ({run_dir})"
+        )
+    completed_rounds = int(summary.get("completed_rounds", 0))
+    if completed_rounds != requested_rounds:
+        raise RuntimeError(
+            f"experiment completed {completed_rounds}/{requested_rounds} requested rounds ({run_dir})"
+        )
+
     metrics = summary.get("final_metrics") or {}
     params = summary.get("algorithm_params") or {}
     return {
@@ -288,7 +305,9 @@ def main() -> None:
                 )
             run_name = matching[-1]
             downloaded = download_run(remote_results_root, run_name, rep_dir / algorithm)
-            row = comparison_row(downloaded, repetition, args.clients)
+            row = comparison_row(
+                downloaded, repetition, args.clients, args.rounds
+            )
             rows.append(row)
             write_csv(batch_dir / "comparison.csv", rows)
             write_markdown(batch_dir / "comparison.md", rows)

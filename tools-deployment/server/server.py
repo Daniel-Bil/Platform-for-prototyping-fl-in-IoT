@@ -83,6 +83,7 @@ class FederatedServer:
         self.rounds_csv = self.run_dir / "rounds.csv"
         self.participants_csv = self.run_dir / "participants.csv"
         self.round_rows: list[dict[str, Any]] = []
+        self.failure_reason: str | None = None
         self._write_run_config()
 
     @staticmethod
@@ -252,14 +253,31 @@ class FederatedServer:
                 break
             threading.Thread(target=self._bootstrap_connection, args=(client_sock, address), daemon=True).start()
 
-    def _weights_are_compatible(self, arrays: list[np.ndarray]) -> bool:
+    def _weights_compatibility_error(self, arrays: list[np.ndarray]) -> str | None:
+        """Return a human-readable incompatibility reason, or ``None``.
+
+        Keeping this diagnostic explicit is useful on real machines: a generic
+        "incompatible tensors" message hides whether a client returned an
+        extra Keras bookkeeping tensor, a wrong architecture, or a bad dtype.
+        """
         if len(arrays) != len(self.global_weights):
-            return False
-        return all(
-            np.asarray(candidate).shape == np.asarray(reference).shape
-            and np.asarray(candidate).dtype.kind in "fiu"
-            for candidate, reference in zip(arrays, self.global_weights)
-        )
+            return f"tensor count mismatch: got {len(arrays)}, expected {len(self.global_weights)}"
+
+        for index, (candidate, reference) in enumerate(zip(arrays, self.global_weights)):
+            candidate_array = np.asarray(candidate)
+            reference_array = np.asarray(reference)
+            if candidate_array.shape != reference_array.shape:
+                return (
+                    f"tensor {index} shape mismatch: got {candidate_array.shape}, "
+                    f"expected {reference_array.shape}"
+                )
+            if candidate_array.dtype.kind not in "fiu":
+                return f"tensor {index} has unsupported dtype {candidate_array.dtype}"
+        return None
+
+    def _weights_are_compatible(self, arrays: list[np.ndarray]) -> bool:
+        # Backward-compatible helper used by tests/older code.
+        return self._weights_compatibility_error(arrays) is None
 
     def _decode_update(self, message: Message) -> list[np.ndarray]:
         meta = message.metadata
@@ -280,8 +298,11 @@ class FederatedServer:
         else:
             arrays = [np.asarray(value) for value in message.arrays]
 
-        if not self._weights_are_compatible(arrays):
-            raise ProtocolError("update model tensors are incompatible with the global model")
+        incompatibility = self._weights_compatibility_error(arrays)
+        if incompatibility is not None:
+            raise ProtocolError(
+                f"update model tensors are incompatible with the global model: {incompatibility}"
+            )
         return arrays
 
     def _collect_round_updates(
@@ -500,19 +521,21 @@ class FederatedServer:
         )
 
     def _write_summary(self) -> None:
+        common = {
+            "status": "failed" if self.failure_reason else "completed",
+            "failure_reason": self.failure_reason,
+            "algorithm": self.algorithm,
+            "algorithm_params": self._algorithm_params(),
+            "seed": int(self.args.seed),
+            "completed_rounds": len(self.round_rows),
+            "run_dir": str(self.run_dir),
+        }
         if not self.round_rows:
-            summary = {
-                "algorithm": self.algorithm,
-                "completed_rounds": 0,
-                "run_dir": str(self.run_dir),
-            }
+            summary = common
         else:
             final = self.round_rows[-1]
             summary = {
-                "algorithm": self.algorithm,
-                "algorithm_params": self._algorithm_params(),
-                "seed": int(self.args.seed),
-                "completed_rounds": len(self.round_rows),
+                **common,
                 "final_round": int(final["round"]),
                 "final_metrics": {
                     key: final.get(key)
@@ -528,7 +551,6 @@ class FederatedServer:
                 "mean_aggregation_seconds": float(
                     sum(float(r["aggregation_seconds"]) for r in self.round_rows) / len(self.round_rows)
                 ),
-                "run_dir": str(self.run_dir),
             }
         (self.run_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
@@ -588,7 +610,11 @@ class FederatedServer:
                 self._save_weights()
                 LOG.info("Round %d %s aggregated %d update(s) in %.4fs", round_id, self.algorithm, len(updates), aggregation_seconds)
             else:
-                LOG.error("Round %d produced no valid updates; global model unchanged", round_id)
+                self.failure_reason = f"round_{round_id}_produced_no_valid_updates"
+                self._write_summary()
+                raise RuntimeError(
+                    f"Round {round_id} produced no valid updates; aborting experiment"
+                )
 
             eval_records: list[dict[str, Any]] = []
             evaluation_phase_seconds = 0.0
@@ -673,7 +699,10 @@ class FederatedServer:
         if not already_stopping:
             for participant in self.registry.snapshot():
                 try:
-                    participant.send({"type": "STOP", "reason": "experiment_finished"})
+                    participant.send({
+                        "type": "STOP",
+                        "reason": self.failure_reason or "experiment_finished",
+                    })
                 except Exception:
                     pass
         self.registry.close_all()
@@ -738,7 +767,11 @@ def main() -> None:
 
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
-    server.serve()
+    try:
+        server.serve()
+    except RuntimeError as exc:
+        LOG.error("Experiment failed: %s", exc)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

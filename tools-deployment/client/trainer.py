@@ -205,8 +205,28 @@ class LocalTrainer:
             values = history.history.get(name, [])
             return float(values[-1]) if values else None
 
+        # IMPORTANT: return only the underlying neural-network tensors.
+        #
+        # ``FedProxModel`` owns metric trackers (base_loss/objective/proximal
+        # term and compiled metrics). Keras tracks those metric variables as
+        # part of the wrapper object, so ``model.get_weights()`` can include
+        # metric state in addition to the actual layer weights.  Those extra
+        # tensors are local bookkeeping and must never be sent to the FL
+        # server.  ``base_model`` shares the exact layer variables used by the
+        # wrapper, so after training it contains the updated network weights
+        # and nothing else.
+        trained_weights = [np.asarray(w) for w in base_model.get_weights()]
+
+        if len(trained_weights) != len(global_weights) or any(
+            candidate.shape != np.asarray(reference).shape
+            for candidate, reference in zip(trained_weights, global_weights)
+        ):
+            raise RuntimeError(
+                "FedProx produced neural-network weights incompatible with the round global model"
+            )
+
         return TrainResult(
-            weights=[np.asarray(w) for w in model.get_weights()],
+            weights=trained_weights,
             train_seconds=elapsed,
             final_loss=last("base_loss"),
             final_accuracy=last("accuracy"),
