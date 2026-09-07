@@ -1,0 +1,33 @@
+# Your laptop's origin is HTTPS, but deployment hosts clone over SSH so the
+# forwarded local ssh-agent can authenticate to GitHub.
+repo_url: "git@github.com:Daniel-Bil/Platform-for-prototyping-fl-in-IoT.git"
+
+# First clone uses the shared development branch, then provisioning explicitly
+# switches the machine to our deployment branch.
+repo_base_branch: "dev"
+repo_branch: "deployment"
+
+# Repository/environment paths on EACH remote host.
+repo_dest: "{{ ansible_env.HOME }}/Platform-for-prototyping-fl-in-IoT"
+deployment_dir: "{{ repo_dest }}/tools-deployment"
+venv_dir: "{{ repo_dest }}/.venv-deployment"
+
+# TensorFlow 2.14.1 has wheels for CPython 3.9-3.11, not CPython 3.12.
+# Keep Ansible on the host's system Python; only the FL venv uses 3.10.
+deployment_python_version: "3.10"
+deployment_python_bin: "/usr/bin/python3.10"
+
+install_python_deps: true
+
+# Federated deployment defaults.
+fl_port: 8090
+fl_rounds: 3
+fl_local_epochs: 1
+fl_batch_size: 32
+fl_join_window: 2
+fl_round_timeout: 300
+fl_model_path: "{{ deployment_dir }}/config/default_model.json"
+
+# Empty = use main's default IPv4 address discovered by Ansible.
+# Override when necessary with: -e fl_server_host=192.168.x.x
+fl_server_host: ""

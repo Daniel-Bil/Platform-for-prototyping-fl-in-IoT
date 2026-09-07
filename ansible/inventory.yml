@@ -1,0 +1,36 @@
+all:
+  vars:
+    # These inventory names are aliases from ~/.ssh/config.
+    # Your existing Host/User/IdentityFile/ProxyJump rules are therefore reused.
+    ansible_connection: ssh
+    ansible_python_interpreter: /usr/bin/python3
+
+    # Git on the remote host uses your LOCAL ssh-agent.
+    # No private key is copied onto main/device-*.
+    ansible_ssh_common_args: "-o ForwardAgent=yes"
+
+  children:
+    fl_server:
+      hosts:
+        main:
+
+    fl_clients:
+      hosts:
+        device-1:
+          fl_dataset_name: client_df_RuralIoT_001
+        device-2:
+          fl_dataset_name: client_df_RuralIoT_002
+        device-3:
+          fl_dataset_name: client_df_RuralIoT_003
+        device-4:
+          fl_dataset_name: client_df_RuralIoT_010
+        device-5:
+          fl_dataset_name: client_df_RuralIoT_21
+        device-6:
+          fl_dataset_name: client_df_RuralIoT_22
+        device-7:
+          fl_dataset_name: client_df_RuralIoT_23
+
+        # Provisioned like every other device, but deliberately not assigned
+        # to an FL dataset yet.
+        device-8:

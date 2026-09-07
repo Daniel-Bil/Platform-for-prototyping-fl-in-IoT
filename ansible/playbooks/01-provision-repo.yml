@@ -1,0 +1,220 @@
+---
+- name: Provision thesis repository and deployment environment
+  hosts: all
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify local ssh-agent is forwarded to the remote host
+      ansible.builtin.shell: |
+        test -n "$SSH_AUTH_SOCK" && ssh-add -l
+      args:
+        executable: /bin/sh
+      register: forwarded_agent
+      changed_when: false
+      failed_when: forwarded_agent.rc != 0
+
+  tasks:
+    - name: Install base packages
+      become: true
+      ansible.builtin.package:
+        name:
+          - git
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Install Ubuntu repository-management package
+      become: true
+      ansible.builtin.apt:
+        name: software-properties-common
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Add deadsnakes PPA for deployment Python on Ubuntu
+      become: true
+      ansible.builtin.apt_repository:
+        repo: ppa:deadsnakes/ppa
+        state: present
+        update_cache: true
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Install TensorFlow-compatible deployment Python
+      become: true
+      ansible.builtin.apt:
+        name:
+          - "python{{ deployment_python_version }}"
+          - "python{{ deployment_python_version }}-venv"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Verify deployment Python exists
+      ansible.builtin.stat:
+        path: "{{ deployment_python_bin }}"
+      register: deployment_python
+
+    - name: Require TensorFlow-compatible Python
+      ansible.builtin.assert:
+        that:
+          - deployment_python.stat.exists
+        fail_msg: >-
+          {{ deployment_python_bin }} is unavailable on {{ inventory_hostname }}.
+          TensorFlow 2.14.1 requires Python 3.9-3.11; deployment is configured
+          for Python {{ deployment_python_version }}.
+
+    - name: Clone repository if it is not present yet
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dest }}"
+        version: "{{ repo_base_branch }}"
+        update: false
+        recursive: true
+        accept_newhostkey: true
+
+    - name: Ensure origin uses the SSH repository URL
+      ansible.builtin.command:
+        cmd: "git remote set-url origin {{ repo_url }}"
+        chdir: "{{ repo_dest }}"
+      changed_when: false
+
+    - name: Fetch latest remote branches
+      ansible.builtin.command:
+        cmd: git fetch origin --prune
+        chdir: "{{ repo_dest }}"
+      register: git_fetch
+      changed_when: >-
+        'new branch' in git_fetch.stderr or
+        'new tag' in git_fetch.stderr or
+        'forced update' in git_fetch.stderr
+
+    - name: Switch repository to deployment branch and update it
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dest }}"
+        version: "{{ repo_branch }}"
+        update: true
+        force: false
+        recursive: true
+        accept_newhostkey: true
+      register: repo_checkout
+
+    - name: Read current branch
+      ansible.builtin.command:
+        cmd: git branch --show-current
+        chdir: "{{ repo_dest }}"
+      register: git_branch
+      changed_when: false
+
+    - name: Verify deployment branch is checked out
+      ansible.builtin.assert:
+        that:
+          - git_branch.stdout == repo_branch
+        fail_msg: >-
+          Expected branch {{ repo_branch }}, but {{ inventory_hostname }} is on
+          {{ git_branch.stdout }}.
+
+    - name: Verify tools-deployment exists on deployment branch
+      ansible.builtin.stat:
+        path: "{{ deployment_dir }}/requirements.txt"
+      register: deployment_requirements
+
+    - name: Fail if deployment code is absent
+      ansible.builtin.assert:
+        that:
+          - deployment_requirements.stat.exists
+        fail_msg: >-
+          {{ deployment_dir }} is missing. Make sure branch {{ repo_branch }}
+          containing tools-deployment has been pushed to GitHub.
+
+    - name: Check whether deployment venv already exists
+      ansible.builtin.stat:
+        path: "{{ venv_dir }}/bin/python"
+      register: existing_venv_python
+      when: install_python_deps | bool
+
+    - name: Read existing deployment venv Python version
+      ansible.builtin.command:
+        cmd: >-
+          {{ venv_dir }}/bin/python -c
+          "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+      register: existing_venv_version
+      changed_when: false
+      failed_when: false
+      when:
+        - install_python_deps | bool
+        - existing_venv_python.stat.exists | default(false)
+
+    - name: Remove incompatible deployment venv
+      ansible.builtin.file:
+        path: "{{ venv_dir }}"
+        state: absent
+      when:
+        - install_python_deps | bool
+        - existing_venv_python.stat.exists | default(false)
+        - existing_venv_version.rc != 0 or existing_venv_version.stdout != deployment_python_version
+
+    - name: Create deployment virtual environment with compatible Python
+      ansible.builtin.command:
+        cmd: "{{ deployment_python_bin }} -m venv {{ venv_dir }}"
+        creates: "{{ venv_dir }}/bin/python"
+      when: install_python_deps | bool
+
+    - name: Verify deployment venv Python version
+      ansible.builtin.command:
+        cmd: >-
+          {{ venv_dir }}/bin/python -c
+          "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
+      register: venv_python_version
+      changed_when: false
+      when: install_python_deps | bool
+
+    - name: Require expected deployment venv Python version
+      ansible.builtin.assert:
+        that:
+          - venv_python_version.stdout == deployment_python_version
+        fail_msg: >-
+          Expected deployment venv Python {{ deployment_python_version }}, got
+          {{ venv_python_version.stdout }}.
+      when: install_python_deps | bool
+
+    - name: Upgrade pip tooling in deployment virtual environment
+      ansible.builtin.pip:
+        name:
+          - pip
+          - setuptools
+          - wheel
+        state: latest
+        executable: "{{ venv_dir }}/bin/pip"
+      when: install_python_deps | bool
+
+    - name: Install tools-deployment Python requirements
+      ansible.builtin.pip:
+        requirements: "{{ deployment_dir }}/requirements.txt"
+        executable: "{{ venv_dir }}/bin/pip"
+      when: install_python_deps | bool
+
+    - name: Verify TensorFlow imports
+      ansible.builtin.command:
+        cmd: >-
+          {{ venv_dir }}/bin/python -c
+          "import tensorflow as tf; print(tf.__version__)"
+      register: tensorflow_version
+      changed_when: false
+      when: install_python_deps | bool
+
+    - name: Show checked-out revision
+      ansible.builtin.command:
+        cmd: git rev-parse --short HEAD
+        chdir: "{{ repo_dest }}"
+      register: git_revision
+      changed_when: false
+
+    - name: Provisioning result
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} ready on branch {{ git_branch.stdout }} at
+          revision {{ git_revision.stdout }}, Python {{ venv_python_version.stdout }},
+          TensorFlow {{ tensorflow_version.stdout }}.

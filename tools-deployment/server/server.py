@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Dynamic-client federated learning server.
+"""Dynamic-client federated learning cloud server.
 
-No client count is configured. At the beginning of every round the server takes
-a snapshot of all clients that are currently registered. Clients that connect
-while a round is running remain connected and automatically join the next round.
+The server has no configured client count. At the beginning of every round it
+snapshots all currently registered participants. A participant that connects
+mid-round waits for the next round automatically.
+
+For FedAvg/FedProx/FedPAQ/FedMA, participants are training clients.
+For HierFedAvg, participants are edge aggregators; training clients connect to
+those edge processes instead of directly to the cloud.
 """
 from __future__ import annotations
 
 import argparse
 import csv
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import logging
@@ -32,78 +35,18 @@ if str(DEPLOYMENT_ROOT) not in sys.path:
 from common.data import DEFAULT_FEATURES
 from common.model import build_model_from_config, load_model_config
 from common.protocol import ConnectionClosed, Message, ProtocolError, recv_message, send_message
-from server.aggregation import weighted_fedavg
+from common.quantization import dequantize_weights
+from common.sessions import ClientRegistry, ClientSession
+from server.aggregation import fedma_aggregate, mean_fedavg, weighted_fedavg
 
 LOG = logging.getLogger("fl-server")
-
-
-@dataclass
-class ClientSession:
-    client_id: str
-    sock: socket.socket
-    address: tuple[str, int]
-    train_samples: int
-    inbox: queue.Queue[Message] = field(default_factory=queue.Queue)
-    send_lock: threading.Lock = field(default_factory=threading.Lock)
-    alive: bool = True
-    bytes_sent: int = 0
-    bytes_received: int = 0
-
-    def send(self, metadata: dict[str, Any], arrays=None) -> None:
-        with self.send_lock:
-            self.bytes_sent += send_message(self.sock, metadata, arrays)
-
-    def close(self) -> None:
-        self.alive = False
-        try:
-            self.sock.shutdown(socket.SHUT_RDWR)
-        except OSError:
-            pass
-        try:
-            self.sock.close()
-        except OSError:
-            pass
-
-
-class ClientRegistry:
-    def __init__(self) -> None:
-        self._clients: dict[str, ClientSession] = {}
-        self._lock = threading.RLock()
-        self._changed = threading.Condition(self._lock)
-
-    def register(self, session: ClientSession) -> None:
-        with self._changed:
-            old = self._clients.get(session.client_id)
-            if old is not None and old is not session:
-                LOG.warning("Replacing previous connection for client %s", session.client_id)
-                old.close()
-            self._clients[session.client_id] = session
-            self._changed.notify_all()
-
-    def remove(self, client_id: str, session: ClientSession) -> None:
-        with self._changed:
-            if self._clients.get(client_id) is session:
-                self._clients.pop(client_id, None)
-                self._changed.notify_all()
-
-    def snapshot(self) -> list[ClientSession]:
-        with self._lock:
-            return [client for client in self._clients.values() if client.alive]
-
-    def wait_for_any(self, shutdown: threading.Event) -> bool:
-        with self._changed:
-            while not shutdown.is_set() and not any(c.alive for c in self._clients.values()):
-                self._changed.wait(timeout=1.0)
-            return not shutdown.is_set()
-
-    def close_all(self) -> None:
-        for client in self.snapshot():
-            client.close()
+SUPPORTED_ALGORITHMS = ("FedAvg", "FedProx", "FedPAQ", "FedMA", "HierFedAvg")
 
 
 class FederatedServer:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
+        self.algorithm = str(args.algorithm)
         self.shutdown = threading.Event()
         self.registry = ClientRegistry()
         self.model_config = load_model_config(args.model)
@@ -125,10 +68,19 @@ class FederatedServer:
         run_dir.mkdir(parents=True, exist_ok=False)
         return run_dir
 
+    def _algorithm_params(self) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if self.algorithm == "FedProx":
+            params["fedprox_mu"] = float(self.args.fedprox_mu)
+        if self.algorithm == "FedPAQ":
+            params["fedpaq_bits"] = int(self.args.fedpaq_bits)
+        return params
+
     def _write_run_config(self) -> None:
         payload = {
             "created_utc": datetime.now(timezone.utc).isoformat(),
-            "algorithm": "FedAvg",
+            "algorithm": self.algorithm,
+            "algorithm_params": self._algorithm_params(),
             "host": self.args.host,
             "port": self.args.port,
             "rounds": self.args.rounds,
@@ -139,8 +91,12 @@ class FederatedServer:
             "round_timeout": self.args.round_timeout,
             "join_window": self.args.join_window,
             "model_path": str(Path(self.args.model).resolve()),
+            "hierarchy": "cloud->edge->client" if self.algorithm == "HierFedAvg" else "cloud->client",
         }
         (self.run_dir / "config.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _expected_role(self) -> str:
+        return "edge" if self.algorithm == "HierFedAvg" else "client"
 
     def _client_reader(self, session: ClientSession) -> None:
         try:
@@ -150,7 +106,7 @@ class FederatedServer:
                 session.inbox.put(message)
         except (ConnectionClosed, OSError, ProtocolError) as exc:
             if not self.shutdown.is_set():
-                LOG.info("Client %s disconnected: %s", session.client_id, exc)
+                LOG.info("%s %s disconnected: %s", session.role.capitalize(), session.client_id, exc)
         finally:
             session.alive = False
             self.registry.remove(session.client_id, session)
@@ -163,39 +119,58 @@ class FederatedServer:
             meta = hello.metadata
             if meta.get("type") != "HELLO":
                 raise ProtocolError("first message must be HELLO")
+
             client_id = str(meta.get("client_id", "")).strip()
             if not client_id or len(client_id) > 128:
                 raise ProtocolError("invalid client_id")
+            role = str(meta.get("role", "client"))
+            expected_role = self._expected_role()
+            if role != expected_role:
+                raise ProtocolError(
+                    f"{self.algorithm} cloud expects role={expected_role!r}, got {role!r}"
+                )
             if self.args.auth_token and meta.get("auth_token") != self.args.auth_token:
                 raise ProtocolError("authentication failed")
 
-            # The server is the source of truth for preprocessing and model config.
-            welcome_bytes = send_message(
-                client_sock,
-                {
-                    "type": "WELCOME",
-                    "client_id": client_id,
-                    "algorithm": "FedAvg",
-                    "seq_len": self.args.seq_len,
-                    "features": list(self.args.features),
-                    "model_config": self.model_config,
-                },
-            )
+            welcome_metadata = {
+                "type": "WELCOME",
+                "client_id": client_id,
+                "role": role,
+                "algorithm": self.algorithm,
+                "seq_len": self.args.seq_len,
+                "features": list(self.args.features),
+                "model_config": self.model_config,
+                **self._algorithm_params(),
+            }
+            welcome_bytes = send_message(client_sock, welcome_metadata)
+
             ready = recv_message(client_sock)
             if ready.metadata.get("type") != "READY":
-                raise ProtocolError("client must send READY after WELCOME")
+                raise ProtocolError("participant must send READY after WELCOME")
             if ready.metadata.get("client_id") != client_id:
                 raise ProtocolError("READY client_id does not match HELLO")
             train_samples = int(ready.metadata.get("train_samples", 0))
             if train_samples <= 0:
-                raise ProtocolError("client must report a positive train_samples value")
+                raise ProtocolError("participant must report positive train_samples")
 
             client_sock.settimeout(None)
-            session = ClientSession(client_id, client_sock, address, train_samples)
+            session = ClientSession(
+                client_id=client_id,
+                sock=client_sock,
+                address=address,
+                train_samples=train_samples,
+                role=role,
+            )
             session.bytes_received += hello.wire_bytes + ready.wire_bytes
             session.bytes_sent += welcome_bytes
             self.registry.register(session)
-            LOG.info("Client %-20s ready from %s:%s (%d train samples)", client_id, *address, train_samples)
+            LOG.info(
+                "%s %-20s ready from %s:%s (%d reported train samples)",
+                role.capitalize(),
+                client_id,
+                *address,
+                train_samples,
+            )
             threading.Thread(target=self._client_reader, args=(session,), daemon=True).start()
         except Exception as exc:
             LOG.warning("Rejected connection from %s:%s: %s", *address, exc)
@@ -235,12 +210,43 @@ class FederatedServer:
             for candidate, reference in zip(arrays, self.global_weights)
         )
 
+    def _decode_update(self, message: Message) -> list[np.ndarray]:
+        meta = message.metadata
+        update_algorithm = str(meta.get("algorithm", self.algorithm))
+        if update_algorithm != self.algorithm:
+            raise ProtocolError(
+                f"update algorithm {update_algorithm!r} differs from experiment {self.algorithm!r}"
+            )
+        if not message.arrays:
+            raise ProtocolError("empty model update")
+
+        if self.algorithm == "FedPAQ":
+            quantization = meta.get("quantization")
+            if not isinstance(quantization, list):
+                raise ProtocolError("FedPAQ update is missing quantization metadata")
+            bits = int(meta.get("fedpaq_bits", 0))
+            if bits != int(self.args.fedpaq_bits):
+                raise ProtocolError(
+                    f"FedPAQ update uses {bits} bits; server configured for {self.args.fedpaq_bits}"
+                )
+            arrays = dequantize_weights(
+                message.arrays,
+                quantization,
+                reference_weights=self.global_weights,
+            )
+        else:
+            arrays = [np.asarray(value) for value in message.arrays]
+
+        if not self._weights_are_compatible(arrays):
+            raise ProtocolError("update model tensors are incompatible with the global model")
+        return arrays
+
     def _collect_round_updates(
         self,
         cohort: list[ClientSession],
         round_id: int,
     ) -> tuple[list[list[np.ndarray]], list[int], list[str]]:
-        pending = {client.client_id: client for client in cohort if client.alive}
+        pending = {participant.client_id: participant for participant in cohort if participant.alive}
         updates: list[list[np.ndarray]] = []
         sample_counts: list[int] = []
         successful_ids: list[str] = []
@@ -256,36 +262,60 @@ class FederatedServer:
                     message = session.inbox.get_nowait()
                 except queue.Empty:
                     continue
+
                 progressed = True
                 meta = message.metadata
-                if meta.get("type") == "UPDATE" and int(meta.get("round", -1)) == round_id:
-                    if not message.arrays:
-                        LOG.warning("Round %d: %s returned an empty update", round_id, client_id)
-                    elif not self._weights_are_compatible(message.arrays):
-                        LOG.warning("Round %d: %s returned incompatible model tensors", round_id, client_id)
+                msg_type = meta.get("type")
+                message_round = int(meta.get("round", -1))
+
+                if msg_type == "UPDATE" and message_round == round_id:
+                    try:
+                        arrays = self._decode_update(message)
+                    except (ProtocolError, ValueError) as exc:
+                        LOG.warning("Round %d: rejected update from %s: %s", round_id, client_id, exc)
                     else:
-                        updates.append(message.arrays)
+                        updates.append(arrays)
                         sample_counts.append(session.train_samples)
                         successful_ids.append(client_id)
+                        extra = ""
+                        if self.algorithm == "HierFedAvg":
+                            extra = f" | children {meta.get('child_count', '?')}"
                         LOG.info(
-                            "Round %d: update <- %s | train %.2fs | loss %s",
+                            "Round %d: update <- %s | train %.2fs | loss %s%s",
                             round_id,
                             client_id,
                             float(meta.get("train_seconds", 0.0)),
                             meta.get("final_loss"),
+                            extra,
                         )
                     pending.pop(client_id, None)
-                elif meta.get("type") == "CLIENT_ERROR" and int(meta.get("round", -1)) == round_id:
-                    LOG.error("Round %d: client %s failed: %s", round_id, client_id, meta.get("error"))
+                elif msg_type == "CLIENT_ERROR" and message_round == round_id:
+                    LOG.error("Round %d: participant %s failed: %s", round_id, client_id, meta.get("error"))
                     pending.pop(client_id, None)
                 else:
-                    LOG.warning("Ignoring unexpected message from %s: %s", client_id, meta.get("type"))
+                    LOG.warning("Ignoring unexpected message from %s: %s", client_id, msg_type)
+
             if not progressed:
                 time.sleep(0.05)
 
         for client_id in pending:
             LOG.warning("Round %d: timed out waiting for %s", round_id, client_id)
         return updates, sample_counts, successful_ids
+
+    def _aggregate(
+        self,
+        updates: list[list[np.ndarray]],
+        sample_counts: list[int],
+    ) -> list[np.ndarray]:
+        if self.algorithm in {"FedAvg", "FedProx", "FedPAQ"}:
+            return weighted_fedavg(updates, sample_counts)
+        if self.algorithm == "FedMA":
+            return fedma_aggregate(self.global_weights, updates)
+        if self.algorithm == "HierFedAvg":
+            # Each update already represents one edge-level average. Cloud-level
+            # averaging mirrors tools2/method_hierfavg.py.
+            return mean_fedavg(updates)
+        raise RuntimeError(f"unsupported algorithm {self.algorithm}")
 
     def _append_round_result(self, row: dict[str, Any]) -> None:
         exists = self.rounds_csv.exists()
@@ -304,7 +334,8 @@ class FederatedServer:
     def run_rounds(self) -> None:
         round_id = 1
         while not self.shutdown.is_set() and (self.args.rounds == 0 or round_id <= self.args.rounds):
-            LOG.info("Waiting for at least one connected client...")
+            role_name = "edge" if self.algorithm == "HierFedAvg" else "client"
+            LOG.info("Waiting for at least one connected %s...", role_name)
             if not self.registry.wait_for_any(self.shutdown):
                 break
 
@@ -318,47 +349,63 @@ class FederatedServer:
             if not cohort:
                 continue
 
-            cohort_ids = [client.client_id for client in cohort]
-            LOG.info("=== ROUND %d | cohort=%s ===", round_id, ", ".join(cohort_ids))
-            before_sent = sum(client.bytes_sent for client in cohort)
-            before_recv = sum(client.bytes_received for client in cohort)
+            cohort_ids = [participant.client_id for participant in cohort]
+            LOG.info(
+                "=== ROUND %d | algorithm=%s | cohort=%s ===",
+                round_id,
+                self.algorithm,
+                ", ".join(cohort_ids),
+            )
+            before_sent = sum(participant.bytes_sent for participant in cohort)
+            before_recv = sum(participant.bytes_received for participant in cohort)
 
-            for client in cohort:
-                if not client.alive:
+            train_metadata = {
+                "type": "TRAIN",
+                "round": round_id,
+                "algorithm": self.algorithm,
+                "local_epochs": self.args.local_epochs,
+                "batch_size": self.args.batch_size,
+                **self._algorithm_params(),
+            }
+            for participant in cohort:
+                if not participant.alive:
                     continue
                 try:
-                    client.send(
-                        {
-                            "type": "TRAIN",
-                            "round": round_id,
-                            "algorithm": "FedAvg",
-                            "local_epochs": self.args.local_epochs,
-                            "batch_size": self.args.batch_size,
-                        },
-                        self.global_weights,
-                    )
+                    participant.send(train_metadata, self.global_weights)
                 except OSError as exc:
-                    LOG.warning("Round %d: failed to send to %s: %s", round_id, client.client_id, exc)
-                    client.close()
+                    LOG.warning(
+                        "Round %d: failed to send to %s: %s",
+                        round_id,
+                        participant.client_id,
+                        exc,
+                    )
+                    participant.close()
 
             started = time.perf_counter()
             updates, sample_counts, successful_ids = self._collect_round_updates(cohort, round_id)
             aggregation_seconds = 0.0
             if updates:
                 agg_started = time.perf_counter()
-                self.global_weights = weighted_fedavg(updates, sample_counts)
+                self.global_weights = self._aggregate(updates, sample_counts)
                 aggregation_seconds = time.perf_counter() - agg_started
                 self._save_weights()
-                LOG.info("Round %d aggregated %d update(s) in %.4fs", round_id, len(updates), aggregation_seconds)
+                LOG.info(
+                    "Round %d %s aggregated %d update(s) in %.4fs",
+                    round_id,
+                    self.algorithm,
+                    len(updates),
+                    aggregation_seconds,
+                )
             else:
                 LOG.error("Round %d produced no valid updates; global model unchanged", round_id)
 
             elapsed = time.perf_counter() - started
-            after_sent = sum(client.bytes_sent for client in cohort)
-            after_recv = sum(client.bytes_received for client in cohort)
+            after_sent = sum(participant.bytes_sent for participant in cohort)
+            after_recv = sum(participant.bytes_received for participant in cohort)
             self._append_round_result(
                 {
                     "round": round_id,
+                    "algorithm": self.algorithm,
                     "cohort_size": len(cohort),
                     "successful_updates": len(updates),
                     "client_ids": ";".join(cohort_ids),
@@ -378,6 +425,7 @@ class FederatedServer:
         self.listener.bind((self.args.host, self.args.port))
         self.listener.listen(self.args.backlog)
         LOG.info("Server listening on %s:%d", self.args.host, self.args.port)
+        LOG.info("Algorithm: %s", self.algorithm)
         LOG.info("Results: %s", self.run_dir)
         threading.Thread(target=self._accept_loop, daemon=True).start()
         try:
@@ -386,14 +434,14 @@ class FederatedServer:
             self.stop()
 
     def stop(self) -> None:
-        if self.shutdown.is_set():
-            return
+        already_stopping = self.shutdown.is_set()
         self.shutdown.set()
-        for client in self.registry.snapshot():
-            try:
-                client.send({"type": "STOP", "reason": "experiment_finished"})
-            except Exception:
-                pass
+        if not already_stopping:
+            for participant in self.registry.snapshot():
+                try:
+                    participant.send({"type": "STOP", "reason": "experiment_finished"})
+                except Exception:
+                    pass
         self.registry.close_all()
         if self.listener is not None:
             try:
@@ -401,7 +449,8 @@ class FederatedServer:
             except OSError:
                 pass
         self._save_weights()
-        LOG.info("Server stopped")
+        if not already_stopping:
+            LOG.info("Server stopped")
 
 
 def parse_args() -> argparse.Namespace:
@@ -409,19 +458,36 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8090)
     parser.add_argument("--model", required=True, help="Path to a tools2-compatible model JSON")
+    parser.add_argument("--algorithm", choices=SUPPORTED_ALGORITHMS, default="FedAvg")
     parser.add_argument("--rounds", type=int, default=3, help="0 = run until Ctrl+C")
     parser.add_argument("--local-epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--seq-len", type=int, default=6)
     parser.add_argument("--features", nargs="+", default=list(DEFAULT_FEATURES))
-    parser.add_argument("--join-window", type=float, default=2.0, help="Seconds to admit newly connected clients before each round snapshot")
+    parser.add_argument("--fedprox-mu", type=float, default=0.01)
+    parser.add_argument("--fedpaq-bits", type=int, default=8)
+    parser.add_argument(
+        "--join-window",
+        type=float,
+        default=2.0,
+        help="Seconds to admit newly connected participants before each round snapshot",
+    )
     parser.add_argument("--round-timeout", type=float, default=300.0)
     parser.add_argument("--handshake-timeout", type=float, default=10.0)
     parser.add_argument("--backlog", type=int, default=128)
     parser.add_argument("--results-dir", default=str(DEPLOYMENT_ROOT / "results"))
-    parser.add_argument("--auth-token", default=os.environ.get("FL_AUTH_TOKEN"), help="Optional shared token; prefer FL_AUTH_TOKEN env var")
+    parser.add_argument(
+        "--auth-token",
+        default=os.environ.get("FL_AUTH_TOKEN"),
+        help="Optional shared token; prefer FL_AUTH_TOKEN env var",
+    )
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.fedprox_mu < 0:
+        parser.error("--fedprox-mu must be >= 0")
+    if not 1 <= args.fedpaq_bits <= 8:
+        parser.error("--fedpaq-bits must be between 1 and 8")
+    return args
 
 
 def main() -> None:

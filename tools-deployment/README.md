@@ -1,109 +1,122 @@
 # tools-deployment
 
-Distributed deployment implementation for the thesis FL platform.
+Real LAN deployment implementation of the thesis federated-learning platform.
+`tools2/` remains untouched and is the single-machine simulation/reference path.
 
-`tools2/` remains untouched and continues to serve as the single-machine simulation/reference implementation. This directory implements the real LAN deployment path.
+## Algorithms
 
-## Current scope
+The cloud server has one implementation and selects the method at runtime:
 
-- Real TCP client/server communication.
-- Persistent client connections.
-- Dynamic number of clients: there is **no configured expected client count**.
-- Clients joining during a round automatically wait for the next round.
-- Binary compressed NumPy model transport (no weight arrays encoded as JSON).
-- Sample-weighted FedAvg aggregation.
-- Per-round timeout and disconnect handling.
-- Per-run results directory with configuration, round metrics and latest global weights.
-- Compatible with the model JSON format and FL dataset format already used by `tools2`. A copy of the current default model is kept in `config/default_model.json`; `tools2/` itself is not modified.
+- `FedAvg` — ordinary local training + sample-weighted FedAvg.
+- `FedProx` — proximal term on each client; cloud aggregation remains sample-weighted FedAvg.
+- `FedPAQ` — ordinary local training, but client updates are actually quantized to 8-bit integers (configurable 1-8 bits) before network transport; the cloud dequantizes and performs sample-weighted averaging.
+- `FedMA` — ordinary local training; cloud aligns hidden filters/neurons using Hungarian matching before averaging, following `tools2/method_fedma.py`.
+- `HierFedAvg` — real three-level topology: cloud -> edge aggregators -> training clients. Edge and cloud averages follow the `tools2/method_hierfavg.py` two-level semantics.
 
-Current algorithm: **FedAvg only**. Other FL methods should be added after the distributed FedAvg path is verified on real machines.
+There is no configured client count in the Python server. Every round snapshots the participants currently connected at that moment.
 
-The server is the source of truth for the model architecture, sequence length and feature list. A client first connects, receives that experiment configuration, prepares its own local dataset, then registers as ready. This prevents different machines from silently training incompatible models.
+## Layout
+
+```text
+tools-deployment/
+├── client/          # training client
+├── edge/            # HierFedAvg edge aggregator
+├── server/          # cloud server + aggregation algorithms
+├── common/          # protocol, data, model, quantization, session registry
+├── config/
+├── tests/
+└── results/
+```
 
 ## Environment
 
-Recommended: Python 3.9.
+The Ansible deployment uses Python 3.10 because TensorFlow 2.14.1 does not provide Python 3.12 wheels.
 
 ```bash
-python3.9 -m venv .venv
+python3.10 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-On Windows PowerShell:
-
-```powershell
-py -3.9 -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-## Code smoke tests
-
-The transport/aggregation/dynamic-client behavior can be checked without TensorFlow:
+## TensorFlow-free smoke tests
 
 ```bash
 python tests/smoke_test.py
 ```
 
-## First smoke test: server + one client
+Tests cover binary transport, weighted FedAvg, FedPAQ quantization, FedMA permutation matching, dynamic late joins, and a full fake HierFedAvg cloud->edge->children round.
 
-Assume the repository layout is unchanged and the big machine has LAN IP `192.168.1.50`.
+## Direct topology: FedAvg / FedProx / FedPAQ / FedMA
 
-### Big machine / server
-
-From `tools-deployment/`:
+Cloud:
 
 ```bash
 python server/server.py \
   --host 0.0.0.0 \
   --port 8090 \
   --model config/default_model.json \
+  --algorithm FedAvg \
   --rounds 3 \
   --local-epochs 1
 ```
 
-Open TCP port 8090 in the server firewall for the private LAN if necessary.
-
-### Small machine / client
-
-Copy the repository (or at minimum `tools-deployment/` plus one prepared client dataset) to the client machine, then run from `tools-deployment/`:
+Client:
 
 ```bash
 python client/client.py \
-  --server 192.168.1.50 \
+  --server 192.168.2.231 \
   --port 8090 \
-  --client-id sensor-003 \
-  --data ../tools2/data/fl_dataset/client_df_RuralIoT_003
+  --client-id device-1 \
+  --data ../tools2/data/fl_dataset/client_df_RuralIoT_001
 ```
 
-The server waits until at least one client exists. Before every round it opens a short `--join-window` (default 2 seconds) and then snapshots all clients that are connected at that moment.
+Change only `--algorithm` on the cloud to run another direct method.
 
-## Adding more clients
-
-Start the exact same client program on any number of machines, using a unique `--client-id` and that machine's local dataset. The server command does not change.
-
-Example second client:
+FedProx parameter:
 
 ```bash
-python client/client.py \
-  --server 192.168.1.50 \
-  --client-id sensor-021 \
-  --data ../tools2/data/fl_dataset/client_df_RuralIoT_21
+--algorithm FedProx --fedprox-mu 0.01
 ```
 
-If it connects while a round is already training, it automatically joins the next round.
+FedPAQ parameter:
 
-## Useful server options
+```bash
+--algorithm FedPAQ --fedpaq-bits 8
+```
 
-- `--rounds 0`: run indefinitely until Ctrl+C.
-- `--join-window 5`: allow a longer period for newly started clients to join before each round snapshot.
-- `--round-timeout 300`: maximum seconds to wait for a client update in one round.
-- `--auth-token ...`: optional shared token. Prefer environment variable `FL_AUTH_TOKEN` instead of command history.
+## HierFedAvg topology
 
-## Output
+```text
+main/cloud:8090
+    |
+    +---- edge-1:8091 ---- device-1, device-3, ...
+    |
+    `---- edge-2:8091 ---- device-2, device-4, ...
+```
 
-Each server start creates:
+Cloud:
+
+```bash
+python server/server.py --host 0.0.0.0 --port 8090 \
+  --model config/default_model.json --algorithm HierFedAvg --rounds 3
+```
+
+Edge:
+
+```bash
+python edge/edge.py \
+  --edge-id edge-1 \
+  --cloud 192.168.2.231 \
+  --cloud-port 8090 \
+  --listen-host 0.0.0.0 \
+  --listen-port 8091
+```
+
+Normal `client/client.py` processes then connect to the edge's address/port. The edge forwards the global model, collects its children concurrently, aggregates their models locally, and sends one edge model to the cloud.
+
+## Results
+
+Every cloud start creates:
 
 ```text
 results/<UTC timestamp>/
@@ -112,30 +125,4 @@ results/<UTC timestamp>/
 └── global_weights.npz
 ```
 
-`rounds.csv` records the cohort, successful updates, aggregation time and actual wire bytes transferred by the deployment protocol.
-
-## Deployment semantics
-
-```text
-server starts
-    |
-    +-- waits for >= 1 registered client
-    |
-    +-- join window
-    |
-    +-- snapshot currently connected clients  <--- round cohort
-    |
-    +-- broadcast current global weights
-    |
-    +-- clients train concurrently
-    |
-    +-- collect valid updates until all respond or timeout
-    |
-    +-- sample-weighted FedAvg
-    |
-    +-- save round result and global weights
-    |
-    `-- next round
-```
-
-A new client never changes a cohort that is already training. A disconnected/timed-out client is skipped for that round; successful clients can still be aggregated.
+`rounds.csv` records the selected algorithm, cohort, successful updates, aggregation time, and actual protocol bytes in both directions. FedPAQ therefore reports real reduced uplink traffic rather than a theoretical estimate.

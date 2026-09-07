@@ -17,6 +17,7 @@ if str(DEPLOYMENT_ROOT) not in sys.path:
 
 from common.data import load_client_data
 from common.protocol import ConnectionClosed, ProtocolError, recv_message, send_message
+from common.quantization import quantize_weights
 from client.trainer import LocalTrainer
 
 LOG = logging.getLogger("fl-client")
@@ -54,10 +55,16 @@ def run(args: argparse.Namespace) -> int:
         if welcome.metadata.get("type") != "WELCOME":
             raise ProtocolError("server did not send WELCOME")
 
+        server_algorithm = str(welcome.metadata.get("algorithm", ""))
+        supported_algorithms = {"FedAvg", "FedProx", "FedPAQ", "FedMA", "HierFedAvg"}
+        if server_algorithm not in supported_algorithms:
+            raise ProtocolError(f"server selected unsupported algorithm {server_algorithm!r}")
+
         server_seq_len = int(welcome.metadata["seq_len"])
         server_features = tuple(str(value) for value in welcome.metadata["features"])
         if not server_features:
             raise ProtocolError("server supplied an empty feature list")
+        LOG.info("Experiment algorithm: %s", server_algorithm)
 
         LOG.info("Loading local data from %s using server experiment config", args.data)
         data = load_client_data(args.data, seq_len=server_seq_len, features=server_features)
@@ -95,30 +102,62 @@ def run(args: argparse.Namespace) -> int:
 
             round_id = int(meta["round"])
             try:
-                if meta.get("algorithm") != "FedAvg":
-                    raise ValueError(f"unsupported algorithm {meta.get('algorithm')!r}")
+                algorithm = str(meta.get("algorithm", ""))
+                if algorithm != server_algorithm:
+                    raise ProtocolError(
+                        f"round algorithm {algorithm!r} differs from handshake {server_algorithm!r}"
+                    )
                 if not message.arrays:
                     raise ProtocolError("TRAIN message has no global weights")
-                LOG.info("Round %d: training started", round_id)
-                result = trainer.train_fedavg(
-                    global_weights=message.arrays,
-                    local_epochs=int(meta["local_epochs"]),
-                    batch_size=int(meta["batch_size"]),
+
+                local_epochs = int(meta["local_epochs"])
+                batch_size = int(meta["batch_size"])
+                LOG.info("Round %d: %s training started", round_id, algorithm)
+
+                if algorithm == "FedProx":
+                    result = trainer.train_fedprox(
+                        global_weights=message.arrays,
+                        local_epochs=local_epochs,
+                        batch_size=batch_size,
+                        mu=float(meta.get("fedprox_mu", 0.01)),
+                    )
+                else:
+                    # FedAvg, FedMA, FedPAQ and HierFedAvg use ordinary local
+                    # optimization. Their differences are in aggregation,
+                    # transport, or topology.
+                    result = trainer.train_standard(
+                        global_weights=message.arrays,
+                        local_epochs=local_epochs,
+                        batch_size=batch_size,
+                    )
+
+                update_metadata = {
+                    "type": "UPDATE",
+                    "round": round_id,
+                    "client_id": args.client_id,
+                    "algorithm": algorithm,
+                    "train_samples": data.train_samples,
+                    "train_seconds": round(result.train_seconds, 6),
+                    "final_loss": result.final_loss,
+                    "final_accuracy": result.final_accuracy,
+                    "final_objective": result.final_objective,
+                }
+                wire_arrays = result.weights
+
+                if algorithm == "FedPAQ":
+                    bits = int(meta.get("fedpaq_bits", 8))
+                    wire_arrays, quantization = quantize_weights(result.weights, bits=bits)
+                    update_metadata["quantization"] = quantization
+                    update_metadata["fedpaq_bits"] = bits
+
+                wire_bytes = send_message(sock, update_metadata, wire_arrays)
+                LOG.info(
+                    "Round %d: update sent (%s, training %.2fs, wire %.1f KiB)",
+                    round_id,
+                    algorithm,
+                    result.train_seconds,
+                    wire_bytes / 1024.0,
                 )
-                send_message(
-                    sock,
-                    {
-                        "type": "UPDATE",
-                        "round": round_id,
-                        "client_id": args.client_id,
-                        "train_samples": data.train_samples,
-                        "train_seconds": round(result.train_seconds, 6),
-                        "final_loss": result.final_loss,
-                        "final_accuracy": result.final_accuracy,
-                    },
-                    result.weights,
-                )
-                LOG.info("Round %d: update sent (training %.2fs)", round_id, result.train_seconds)
             except Exception as exc:
                 LOG.exception("Round %d failed", round_id)
                 send_message(
