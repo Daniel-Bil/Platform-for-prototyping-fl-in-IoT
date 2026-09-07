@@ -1,0 +1,6 @@
+# Python 3.9 recommended to match the existing thesis project.
+# TensorFlow 2.14 requires NumPy 1.x.
+numpy>=1.23.5,<2.0
+pandas>=1.5,<2.2
+scikit-learn>=1.2,<1.5
+tensorflow==2.14.1
