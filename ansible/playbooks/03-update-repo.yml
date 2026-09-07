@@ -1,0 +1,129 @@
+---
+- name: Update thesis repository on all deployment machines
+  hosts: all
+  gather_facts: true
+
+  pre_tasks:
+    - name: Verify local ssh-agent is forwarded to the remote host
+      ansible.builtin.shell: |
+        test -n "$SSH_AUTH_SOCK" && ssh-add -l
+      args:
+        executable: /bin/sh
+      register: forwarded_agent
+      changed_when: false
+      failed_when: forwarded_agent.rc != 0
+
+    - name: Verify repository exists
+      ansible.builtin.stat:
+        path: "{{ repo_dest }}/.git"
+      register: repo_git_dir
+
+    - name: Require repository to have been provisioned first
+      ansible.builtin.assert:
+        that:
+          - repo_git_dir.stat.exists
+        fail_msg: >-
+          {{ repo_dest }} is not a Git repository on {{ inventory_hostname }}.
+          Run 01-provision-repo.yml first.
+
+    - name: Verify deployment virtual environment exists
+      ansible.builtin.stat:
+        path: "{{ venv_dir }}/bin/pip"
+      register: deployment_venv
+
+    - name: Require deployment environment to have been provisioned first
+      ansible.builtin.assert:
+        that:
+          - deployment_venv.stat.exists
+        fail_msg: >-
+          {{ venv_dir }} is missing on {{ inventory_hostname }}.
+          Run 01-provision-repo.yml first.
+
+  tasks:
+    - name: Check for tracked uncommitted repository changes
+      ansible.builtin.command:
+        cmd: git status --porcelain --untracked-files=no
+        chdir: "{{ repo_dest }}"
+      register: git_status
+      changed_when: false
+
+    - name: Refuse to overwrite local changes
+      ansible.builtin.assert:
+        that:
+          - git_status.stdout | trim == ''
+        fail_msg: >-
+          {{ inventory_hostname }} has tracked uncommitted changes in {{ repo_dest }}.
+          Update aborted instead of overwriting them:\n{{ git_status.stdout }}
+
+    - name: Ensure origin uses deployment SSH repository URL
+      ansible.builtin.command:
+        cmd: "git remote set-url origin {{ repo_url }}"
+        chdir: "{{ repo_dest }}"
+      changed_when: false
+
+    - name: Fetch latest repository state
+      ansible.builtin.command:
+        cmd: git fetch origin --prune
+        chdir: "{{ repo_dest }}"
+      register: git_fetch
+      changed_when: >-
+        'new branch' in git_fetch.stderr or
+        'new tag' in git_fetch.stderr or
+        'forced update' in git_fetch.stderr or
+        '->' in git_fetch.stderr
+
+    - name: Switch to deployment branch
+      ansible.builtin.command:
+        cmd: "git switch {{ repo_branch }}"
+        chdir: "{{ repo_dest }}"
+      register: git_switch
+      changed_when: "'Already on' not in git_switch.stdout and 'Already on' not in git_switch.stderr"
+
+    - name: Fast-forward deployment branch to origin
+      ansible.builtin.command:
+        cmd: "git pull --ff-only origin {{ repo_branch }}"
+        chdir: "{{ repo_dest }}"
+      register: git_pull
+      changed_when: "'Already up to date.' not in git_pull.stdout"
+
+    - name: Update git submodules if repository uses them
+      ansible.builtin.command:
+        cmd: git submodule update --init --recursive
+        chdir: "{{ repo_dest }}"
+      register: git_submodules
+      changed_when: git_submodules.stdout | trim != ''
+
+    # This is intentionally lightweight: it does not recreate Python or install
+    # OS packages, but keeps the existing venv synchronized when requirements
+    # change on the deployment branch (e.g. scipy for FedMA).
+    - name: Synchronize deployment Python requirements
+      ansible.builtin.pip:
+        requirements: "{{ deployment_dir }}/requirements.txt"
+        executable: "{{ venv_dir }}/bin/pip"
+      when: install_python_deps | bool
+
+    - name: Read checked-out branch
+      ansible.builtin.command:
+        cmd: git branch --show-current
+        chdir: "{{ repo_dest }}"
+      register: git_branch
+      changed_when: false
+
+    - name: Read checked-out revision
+      ansible.builtin.command:
+        cmd: git rev-parse --short HEAD
+        chdir: "{{ repo_dest }}"
+      register: git_revision
+      changed_when: false
+
+    - name: Verify branch after update
+      ansible.builtin.assert:
+        that:
+          - git_branch.stdout == repo_branch
+        fail_msg: >-
+          Expected {{ repo_branch }} after update, got {{ git_branch.stdout }}.
+
+    - name: Show update result
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }} updated to {{ git_branch.stdout }}@{{ git_revision.stdout }}.

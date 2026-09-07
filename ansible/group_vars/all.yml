@@ -20,12 +20,22 @@ deployment_python_bin: "/usr/bin/python3.10"
 install_python_deps: true
 
 # Federated deployment defaults.
+# Supported: FedAvg, FedProx, FedPAQ, FedMA, HierFedAvg
+fl_algorithm: "FedAvg"
 fl_port: 8090
+fl_edge_port: 8091
+fl_edge_count: 2
+fl_fedprox_mu: 0.01
+fl_fedpaq_bits: 8
 fl_rounds: 3
 fl_local_epochs: 1
 fl_batch_size: 32
 fl_join_window: 2
 fl_round_timeout: 300
+fl_evaluation_timeout: 300
+fl_evaluate_every: 1
+fl_eval_batch_size: 256
+fl_seed: 42
 fl_model_path: "{{ deployment_dir }}/config/default_model.json"
 
 # Empty = use main's default IPv4 address discovered by Ansible.

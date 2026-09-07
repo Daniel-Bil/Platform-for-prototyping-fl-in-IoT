@@ -1,7 +1,8 @@
-"""Client-side local training strategies."""
+"""Client-side local training and evaluation strategies."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+import random
 import time
 from typing import Any, Sequence
 
@@ -20,8 +21,20 @@ class TrainResult:
     final_objective: float | None = None
 
 
+@dataclass(frozen=True)
+class EvalResult:
+    test_samples: int
+    test_loss: float
+    accuracy: float
+    tp: int
+    tn: int
+    fp: int
+    fn: int
+    eval_seconds: float
+
+
 class LocalTrainer:
-    """Runs one local FL round with a fresh optimizer/model every round."""
+    """Runs local FL work with a fresh optimizer/model for every operation."""
 
     def __init__(self, model_config: dict[str, Any], data: ClientData, seq_len: int, num_features: int):
         self.model_config = model_config
@@ -29,9 +42,20 @@ class LocalTrainer:
         self.seq_len = seq_len
         self.num_features = num_features
 
-    def _fresh_model(self, global_weights: Sequence[np.ndarray]):
+    @staticmethod
+    def _set_seed(seed: int | None) -> None:
+        if seed is None:
+            return
+        import tensorflow as tf
+
+        random.seed(seed)
+        np.random.seed(seed)
+        tf.keras.utils.set_random_seed(seed)
+
+    def _fresh_model(self, global_weights: Sequence[np.ndarray], seed: int | None = None):
         # A fresh model resets optimizer state each FL round, matching tools2 and
         # standard synchronous FL local-round semantics.
+        self._set_seed(seed)
         model = build_model_from_config(
             self.model_config,
             seq_len=self.seq_len,
@@ -45,9 +69,10 @@ class LocalTrainer:
         global_weights: Sequence[np.ndarray],
         local_epochs: int,
         batch_size: int,
+        seed: int | None = None,
     ) -> TrainResult:
-        """Ordinary local optimization used by FedAvg/FedMA/FedPAQ."""
-        model = self._fresh_model(global_weights)
+        """Ordinary local optimization used by FedAvg/FedMA/FedPAQ/HierFedAvg."""
+        model = self._fresh_model(global_weights, seed=seed)
         started = time.perf_counter()
         history = model.fit(
             self.data.X_train,
@@ -76,6 +101,7 @@ class LocalTrainer:
         local_epochs: int,
         batch_size: int,
         mu: float,
+        seed: int | None = None,
     ) -> TrainResult:
         """FedProx local training with proximal regularization.
 
@@ -90,15 +116,13 @@ class LocalTrainer:
 
         import tensorflow as tf
 
-        model = self._fresh_model(global_weights)
+        model = self._fresh_model(global_weights, seed=seed)
         optimizer = tf.keras.optimizers.Adam()
         loss_fn = tf.keras.losses.BinaryCrossentropy()
 
         # After set_weights(), these constants are exactly the trainable global
         # parameters from the beginning of this federated round.
         global_trainable = [tf.constant(v.numpy()) for v in model.trainable_variables]
-        if len(global_trainable) != len(model.trainable_variables):
-            raise RuntimeError("unable to snapshot FedProx global trainable variables")
 
         @tf.function
         def train_step(x_batch, y_batch):
@@ -118,7 +142,11 @@ class LocalTrainer:
 
         dataset = (
             tf.data.Dataset.from_tensor_slices((self.data.X_train, self.data.y_train))
-            .shuffle(max(1, min(len(self.data.X_train), 10000)), reshuffle_each_iteration=True)
+            .shuffle(
+                max(1, min(len(self.data.X_train), 10000)),
+                seed=seed,
+                reshuffle_each_iteration=True,
+            )
             .batch(batch_size)
         )
 
@@ -147,4 +175,55 @@ class LocalTrainer:
             final_loss=final_base_loss,
             final_accuracy=final_accuracy,
             final_objective=final_objective,
+        )
+
+    def evaluate(
+        self,
+        global_weights: Sequence[np.ndarray],
+        batch_size: int = 256,
+        seed: int | None = None,
+    ) -> EvalResult:
+        """Evaluate the global model locally and return only sufficient statistics.
+
+        No test samples or predictions leave the client.  Confusion counts are
+        enough for the cloud to reconstruct exact global accuracy/precision/
+        recall/F1 across all participating clients.
+        """
+        if len(self.data.X_test) == 0:
+            raise ValueError("test split contains no sequences")
+
+        model = self._fresh_model(global_weights, seed=seed)
+        started = time.perf_counter()
+        probabilities = np.asarray(
+            model.predict(self.data.X_test, batch_size=batch_size, verbose=0)
+        ).reshape(-1)
+        elapsed = time.perf_counter() - started
+
+        y_true = np.asarray(self.data.y_test).reshape(-1).astype(np.int64)
+        if probabilities.shape[0] != y_true.shape[0]:
+            raise RuntimeError("prediction count does not match test labels")
+        y_pred = (probabilities >= 0.5).astype(np.int64)
+
+        tp = int(np.sum((y_true == 1) & (y_pred == 1)))
+        tn = int(np.sum((y_true == 0) & (y_pred == 0)))
+        fp = int(np.sum((y_true == 0) & (y_pred == 1)))
+        fn = int(np.sum((y_true == 1) & (y_pred == 0)))
+
+        # Binary cross entropy from probabilities.  This avoids shipping raw
+        # predictions and is directly sample-weightable at the cloud.
+        eps = np.finfo(np.float32).eps
+        clipped = np.clip(probabilities.astype(np.float64), eps, 1.0 - eps)
+        truth = y_true.astype(np.float64)
+        test_loss = float(-np.mean(truth * np.log(clipped) + (1.0 - truth) * np.log(1.0 - clipped)))
+        accuracy = float((tp + tn) / len(y_true))
+
+        return EvalResult(
+            test_samples=int(len(y_true)),
+            test_loss=test_loss,
+            accuracy=accuracy,
+            tp=tp,
+            tn=tn,
+            fp=fp,
+            fn=fn,
+            eval_seconds=elapsed,
         )

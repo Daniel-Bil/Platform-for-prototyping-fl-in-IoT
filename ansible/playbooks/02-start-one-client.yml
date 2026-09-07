@@ -1,21 +1,36 @@
 ---
-# Starts one FL server on `main` and a caller-selected number of clients.
-# Clients are selected in inventory order from hosts that have fl_dataset_name.
+# One generic experiment launcher for all deployment algorithms.
 #
-# Example:
-#   ansible-playbook -i ansible/inventory.yml \
-#     ansible/playbooks/02-start-one-client.yml \
-#     -e fl_client_count=3
+# Direct methods:
+#   - FedAvg
+#   - FedProx
+#   - FedPAQ
+#   - FedMA
 #
-# With the current inventory this selects device-1, device-2, device-3.
-# device-8 is ignored until it receives fl_dataset_name.
+# HierFedAvg automatically starts edge aggregators on the first N selected
+# devices and assigns selected training clients to those edges round-robin.
+# Edge hosts also keep their own logical client/dataset and therefore run both
+# fl-thesis-edge.service and fl-thesis-client.service.
+#
+# Examples:
+#   -e fl_client_count=4 -e fl_algorithm=FedAvg
+#   -e fl_client_count=4 -e fl_algorithm=FedProx -e fl_fedprox_mu=0.01
+#   -e fl_client_count=4 -e fl_algorithm=FedPAQ -e fl_fedpaq_bits=8
+#   -e fl_client_count=4 -e fl_algorithm=FedMA
+#   -e fl_client_count=7 -e fl_algorithm=HierFedAvg -e fl_edge_count=2
 
-- name: Select FL clients for this experiment
+- name: Select participants for this experiment
   hosts: localhost
   connection: local
   gather_facts: false
   vars:
     requested_client_count: "{{ fl_client_count | default(0) | int }}"
+    supported_algorithms:
+      - FedAvg
+      - FedProx
+      - FedPAQ
+      - FedMA
+      - HierFedAvg
   tasks:
     - name: Build list of clients that have datasets assigned
       ansible.builtin.set_fact:
@@ -25,29 +40,64 @@
         - hostvars[item].fl_dataset_name is defined
         - hostvars[item].fl_dataset_name | string | length > 0
 
-    - name: Validate requested client count
+    - name: Validate experiment parameters
       ansible.builtin.assert:
         that:
+          - fl_algorithm in supported_algorithms
           - requested_client_count | int >= 1
           - requested_client_count | int <= eligible_fl_clients | default([]) | length
+          - fl_fedprox_mu | float >= 0
+          - fl_fedpaq_bits | int >= 1
+          - fl_fedpaq_bits | int <= 8
         fail_msg: >-
-          Pass -e fl_client_count=N, where N is between 1 and
-          {{ eligible_fl_clients | default([]) | length }} for the current inventory.
-          Dataset-backed clients: {{ eligible_fl_clients | default([]) | join(', ') }}.
+          Invalid experiment parameters. algorithm={{ fl_algorithm }},
+          client_count={{ requested_client_count }}, eligible={{ eligible_fl_clients | default([]) | length }}.
 
-    - name: Add selected clients to temporary experiment group
+    - name: Save selected client list
+      ansible.builtin.set_fact:
+        selected_fl_clients: "{{ (eligible_fl_clients | default([]))[0:(requested_client_count | int)] }}"
+
+    - name: Validate HierFedAvg edge count
+      ansible.builtin.assert:
+        that:
+          - fl_edge_count | int >= 1
+          - fl_edge_count | int <= requested_client_count | int
+        fail_msg: "For HierFedAvg, fl_edge_count must be between 1 and fl_client_count."
+      when: fl_algorithm == 'HierFedAvg'
+
+    - name: Save HierFedAvg edge list
+      ansible.builtin.set_fact:
+        selected_fl_edges: "{{ selected_fl_clients[0:(fl_edge_count | int)] }}"
+      when: fl_algorithm == 'HierFedAvg'
+
+    - name: Add selected direct/hierarchical clients to temporary group
       ansible.builtin.add_host:
         name: "{{ item }}"
         groups: fl_selected_clients
-      loop: "{{ (eligible_fl_clients | default([]))[0:(requested_client_count | int)] }}"
+        fl_assigned_edge: >-
+          {{ selected_fl_edges[client_index % (fl_edge_count | int)]
+             if fl_algorithm == 'HierFedAvg' else '' }}
+      loop: "{{ selected_fl_clients }}"
+      loop_control:
+        index_var: client_index
 
-    - name: Show experiment client selection
+    - name: Add selected HierFedAvg edge hosts to temporary group
+      ansible.builtin.add_host:
+        name: "{{ item }}"
+        groups: fl_selected_edges
+        fl_edge_id: "edge-{{ edge_index + 1 }}"
+      loop: "{{ selected_fl_edges | default([]) }}"
+      loop_control:
+        index_var: edge_index
+      when: fl_algorithm == 'HierFedAvg'
+
+    - name: Show experiment selection
       ansible.builtin.debug:
         msg: >-
-          Starting {{ requested_client_count }} client(s):
-          {{ (eligible_fl_clients | default([]))[0:(requested_client_count | int)] | join(', ') }}
+          Algorithm={{ fl_algorithm }}; clients={{ selected_fl_clients | join(', ') }};
+          edges={{ selected_fl_edges | default([]) | join(', ') }}.
 
-- name: Stop stale FL clients before experiment
+- name: Stop stale FL client and edge services before experiment
   hosts: fl_clients
   gather_facts: false
   become: true
@@ -61,13 +111,19 @@
         state: stopped
       when: "'fl-thesis-client.service' in ansible_facts.services"
 
-- name: Start federated server on main
+    - name: Stop existing FL edge service if present
+      ansible.builtin.systemd:
+        name: fl-thesis-edge.service
+        state: stopped
+      when: "'fl-thesis-edge.service' in ansible_facts.services"
+
+- name: Start federated cloud server on main
   hosts: main
   gather_facts: true
   vars:
     fl_run_user: "{{ ansible_user_id }}"
   tasks:
-    - name: Resolve server address clients should use
+    - name: Resolve cloud address participants should use
       ansible.builtin.set_fact:
         fl_server_address_effective: >-
           {{ fl_server_host if (fl_server_host | length > 0) else ansible_default_ipv4.address }}
@@ -81,17 +137,16 @@
       ansible.builtin.assert:
         that:
           - server_python.stat.exists
-        fail_msg: >-
-          Deployment venv is missing on main. Run 01-provision-repo.yml first.
+        fail_msg: "Deployment venv is missing on main. Run 01-provision-repo.yml first."
 
-    - name: Install systemd unit for FL server
+    - name: Install systemd unit for FL cloud server
       become: true
       ansible.builtin.copy:
         dest: /etc/systemd/system/fl-thesis-server.service
         mode: "0644"
         content: |
           [Unit]
-          Description=Master thesis federated-learning server
+          Description=Master thesis federated-learning cloud server
           Wants=network-online.target
           After=network-online.target
 
@@ -100,26 +155,28 @@
           User={{ fl_run_user }}
           WorkingDirectory={{ deployment_dir }}
           Environment=PYTHONUNBUFFERED=1
-          ExecStart={{ venv_dir }}/bin/python {{ deployment_dir }}/server/server.py --host 0.0.0.0 --port {{ fl_port }} --model {{ fl_model_path }} --rounds {{ fl_rounds }} --local-epochs {{ fl_local_epochs }} --batch-size {{ fl_batch_size }} --join-window {{ fl_join_window }} --round-timeout {{ fl_round_timeout }}
+          ExecStart={{ venv_dir }}/bin/python {{ deployment_dir }}/server/server.py --host 0.0.0.0 --port {{ fl_port }} --model {{ fl_model_path }} --algorithm {{ fl_algorithm }} --rounds {{ fl_rounds }} --local-epochs {{ fl_local_epochs }} --batch-size {{ fl_batch_size }} --join-window {{ fl_join_window }} --round-timeout {{ fl_round_timeout }} --evaluation-timeout {{ fl_evaluation_timeout }} --evaluate-every {{ fl_evaluate_every }} --eval-batch-size {{ fl_eval_batch_size }} --seed {{ fl_seed }} --fedprox-mu {{ fl_fedprox_mu }} --fedpaq-bits {{ fl_fedpaq_bits }}
           Restart=no
 
           [Install]
           WantedBy=multi-user.target
       notify: Reload systemd on server
 
-    - name: Flush server systemd reload
+    - name: Flush cloud systemd reload
       ansible.builtin.meta: flush_handlers
 
-    - name: Restart FL server for a clean experiment
+    - name: Restart FL cloud server for a clean experiment
       become: true
       ansible.builtin.systemd:
         name: fl-thesis-server.service
         state: restarted
         enabled: false
 
-    - name: Show server endpoint
+    - name: Show cloud endpoint
       ansible.builtin.debug:
-        msg: "FL server listening for clients at {{ fl_server_address_effective }}:{{ fl_port }}"
+        msg: >-
+          FL {{ fl_algorithm }} cloud listening at
+          {{ fl_server_address_effective }}:{{ fl_port }}
 
   handlers:
     - name: Reload systemd on server
@@ -127,7 +184,82 @@
       ansible.builtin.systemd:
         daemon_reload: true
 
-- name: Start selected FL clients
+- name: Start HierFedAvg edge aggregators
+  hosts: fl_selected_edges
+  gather_facts: true
+  vars:
+    fl_run_user: "{{ ansible_user_id }}"
+  tasks:
+    - name: Verify edge deployment environment exists
+      ansible.builtin.stat:
+        path: "{{ venv_dir }}/bin/python"
+      register: edge_python
+
+    - name: Require provisioned edge environment
+      ansible.builtin.assert:
+        that:
+          - edge_python.stat.exists
+        fail_msg: "Deployment venv missing on {{ inventory_hostname }}. Run 01-provision-repo.yml first."
+
+    - name: Install systemd unit for HierFedAvg edge
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/fl-thesis-edge.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Master thesis HierFedAvg edge aggregator ({{ fl_edge_id }})
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          Type=simple
+          User={{ fl_run_user }}
+          WorkingDirectory={{ deployment_dir }}
+          Environment=PYTHONUNBUFFERED=1
+          ExecStart={{ venv_dir }}/bin/python {{ deployment_dir }}/edge/edge.py --edge-id {{ fl_edge_id }} --cloud {{ hostvars['main']['fl_server_address_effective'] }} --cloud-port {{ fl_port }} --listen-host 0.0.0.0 --listen-port {{ fl_edge_port }} --round-timeout {{ fl_round_timeout }}
+          Restart=on-failure
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd on edge
+
+    - name: Flush edge systemd reload
+      ansible.builtin.meta: flush_handlers
+
+    - name: Start HierFedAvg edge service
+      become: true
+      ansible.builtin.systemd:
+        name: fl-thesis-edge.service
+        state: restarted
+        enabled: false
+
+    - name: Wait until edge listener is ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_default_ipv4.address }}"
+        port: "{{ fl_edge_port }}"
+        connect_timeout: 2
+        timeout: 60
+        state: started
+
+    - name: Publish effective edge address for child assignment
+      ansible.builtin.set_fact:
+        fl_edge_address_effective: "{{ ansible_default_ipv4.address }}"
+
+    - name: Show edge endpoint
+      ansible.builtin.debug:
+        msg: >-
+          {{ fl_edge_id }} on {{ inventory_hostname }} listening at
+          {{ fl_edge_address_effective }}:{{ fl_edge_port }}
+
+  handlers:
+    - name: Reload systemd on edge
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+- name: Start selected FL training clients
   hosts: fl_selected_clients
   gather_facts: true
   vars:
@@ -140,8 +272,16 @@
         that:
           - fl_dataset_name is defined
           - fl_dataset_name | length > 0
-        fail_msg: >-
-          {{ inventory_hostname }} has no fl_dataset_name in inventory.yml.
+        fail_msg: "{{ inventory_hostname }} has no fl_dataset_name in inventory.yml."
+
+    - name: Resolve training server endpoint for this client
+      ansible.builtin.set_fact:
+        fl_client_server_host: >-
+          {{ hostvars[fl_assigned_edge]['fl_edge_address_effective']
+             if fl_algorithm == 'HierFedAvg'
+             else hostvars['main']['fl_server_address_effective'] }}
+        fl_client_server_port: >-
+          {{ fl_edge_port if fl_algorithm == 'HierFedAvg' else fl_port }}
 
     - name: Verify client deployment environment exists
       ansible.builtin.stat:
@@ -152,9 +292,7 @@
       ansible.builtin.assert:
         that:
           - client_python.stat.exists
-        fail_msg: >-
-          Deployment venv is missing on {{ inventory_hostname }}.
-          Run 01-provision-repo.yml first.
+        fail_msg: "Deployment venv missing on {{ inventory_hostname }}. Run 01-provision-repo.yml first."
 
     - name: Verify local FL dataset exists
       ansible.builtin.stat:
@@ -167,10 +305,10 @@
           - client_dataset.stat.exists
         fail_msg: "Missing dataset: {{ fl_client_data_path }}"
 
-    - name: Check server port from the client machine
+    - name: Check assigned server port from client machine
       ansible.builtin.wait_for:
-        host: "{{ hostvars['main']['fl_server_address_effective'] }}"
-        port: "{{ fl_port }}"
+        host: "{{ fl_client_server_host }}"
+        port: "{{ fl_client_server_port }}"
         connect_timeout: 3
         timeout: 60
         state: started
@@ -191,7 +329,7 @@
           User={{ fl_run_user }}
           WorkingDirectory={{ deployment_dir }}
           Environment=PYTHONUNBUFFERED=1
-          ExecStart={{ venv_dir }}/bin/python {{ deployment_dir }}/client/client.py --server {{ hostvars['main']['fl_server_address_effective'] }} --port {{ fl_port }} --client-id {{ fl_client_id_effective }} --data {{ fl_client_data_path }}
+          ExecStart={{ venv_dir }}/bin/python {{ deployment_dir }}/client/client.py --server {{ fl_client_server_host }} --port {{ fl_client_server_port }} --client-id {{ fl_client_id_effective }} --data {{ fl_client_data_path }}
           Restart=on-failure
           RestartSec=3
 
@@ -213,7 +351,8 @@
       ansible.builtin.debug:
         msg: >-
           Started {{ fl_client_id_effective }} using {{ fl_dataset_name }}
-          against {{ hostvars['main']['fl_server_address_effective'] }}:{{ fl_port }}.
+          against {{ fl_client_server_host }}:{{ fl_client_server_port }}
+          for {{ fl_algorithm }}.
 
   handlers:
     - name: Reload systemd on client

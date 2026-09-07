@@ -1,18 +1,11 @@
 # Ansible deployment
 
-The inventory hostnames match aliases from `~/.ssh/config`, so Ansible reuses
-existing SSH users, keys, and `ProxyJump main` configuration.
+Inventory names match aliases from `~/.ssh/config`, so Ansible reuses your SSH
+users/keys and the existing `ProxyJump main` setup. Git cloning uses the SSH
+repository URL with forwarded local ssh-agent; private keys are not copied to
+remote machines.
 
-GitHub cloning uses the SSH repository URL and forwarded local ssh-agent. No
-private SSH key is copied to any remote machine.
-
-## Connectivity
-
-```bash
-ansible all -i ansible/inventory.yml -m ping
-```
-
-## Provision main + first client
+## 1. Provision machines
 
 ```bash
 ansible-playbook \
@@ -21,47 +14,91 @@ ansible-playbook \
   --limit 'main:device-1'
 ```
 
-The provisioning playbook:
+Omit `--limit` to provision every machine. Provisioning checks out the
+`deployment` branch and creates a Python 3.10 `.venv-deployment` for TensorFlow
+2.14.1.
 
-1. installs Git/Python prerequisites,
-2. clones the repository if absent,
-3. fetches GitHub,
-4. explicitly checks out `deployment`,
-5. creates `.venv-deployment`,
-6. installs `tools-deployment/requirements.txt`.
+## 2. Update code after a push
 
-To provision every machine, omit `--limit`.
+```bash
+ansible-playbook \
+  -i ansible/inventory.yml \
+  ansible/playbooks/03-update-repo.yml
+```
 
-## Start 1 server + N clients
+The updater fetches and fast-forwards the deployment branch on `main` and all
+`device-*` hosts, then synchronizes the existing Python environment. It refuses
+to overwrite tracked source modifications made directly on a remote host.
 
-Specify how many dataset-backed clients should participate. Clients are selected
-in inventory order, so `-e fl_client_count=3` starts `device-1` through `device-3`.
+## 3. Run an experiment
+
+The same launcher runs every method and any supported number of dataset-backed
+clients.
 
 ```bash
 ansible-playbook \
   -i ansible/inventory.yml \
   ansible/playbooks/02-start-one-client.yml \
-  -e fl_client_count=3
+  -e fl_client_count=4 \
+  -e fl_algorithm=FedAvg
 ```
 
-Examples:
+Direct methods:
 
 ```bash
-# main + device-1
--e fl_client_count=1
-
-# main + device-1..device-4
--e fl_client_count=4
-
-# main + every currently dataset-backed client (device-1..device-7)
--e fl_client_count=7
+-e fl_algorithm=FedAvg
+-e fl_algorithm=FedProx -e fl_fedprox_mu=0.01
+-e fl_algorithm=FedPAQ -e fl_fedpaq_bits=8
+-e fl_algorithm=FedMA
 ```
 
-Before starting the selected clients, the playbook stops any stale
-`fl-thesis-client.service` on all devices. `device-8` is provisionable but is
-automatically excluded until `fl_dataset_name` is assigned to it.
+HierFedAvg:
 
+```bash
+ansible-playbook \
+  -i ansible/inventory.yml \
+  ansible/playbooks/02-start-one-client.yml \
+  -e fl_client_count=7 \
+  -e fl_algorithm=HierFedAvg \
+  -e fl_edge_count=2
+```
 
-## Python compatibility
+For seven clients and two edges:
 
-`tensorflow==2.14.1` does not provide a CPython 3.12 wheel. Provisioning therefore keeps Ansible on the host system Python but installs Python 3.10 for `.venv-deployment`. On Ubuntu the playbook enables `ppa:deadsnakes/ppa` to obtain Python 3.10. If an old `.venv-deployment` was created with Python 3.12, it is automatically removed and recreated with Python 3.10.
+```text
+main/cloud
+  +-- edge-1 on device-1 <- device-1, device-3, device-5, device-7
+  `-- edge-2 on device-2 <- device-2, device-4, device-6
+```
+
+Before every experiment the launcher stops stale client and edge services on all
+`device-*` hosts, restarts the cloud server, then starts only the selected
+participants. `device-8` remains excluded until `fl_dataset_name` is assigned.
+
+## Reproducible evaluation defaults
+
+Defaults in `ansible/group_vars/all.yml`:
+
+```yaml
+fl_seed: 42
+fl_evaluate_every: 1
+fl_eval_batch_size: 256
+fl_evaluation_timeout: 300
+```
+
+Override them per run with `-e`, for example:
+
+```bash
+-e fl_rounds=20 -e fl_local_epochs=3 -e fl_seed=123
+```
+
+## Result files
+
+The cloud writes each run under:
+
+```text
+~/Platform-for-prototyping-fl-in-IoT/tools-deployment/results/<timestamp>_<algorithm>/
+```
+
+with `config.json`, `rounds.csv`, `participants.csv`, `summary.json` and
+`global_weights.npz`.
