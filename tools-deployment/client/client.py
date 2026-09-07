@@ -149,6 +149,7 @@ def run(args: argparse.Namespace) -> int:
                         "final_loss": result.final_loss,
                         "final_accuracy": result.final_accuracy,
                         "final_objective": result.final_objective,
+                        "final_proximal_term": result.final_proximal_term,
                     }
                     wire_arrays = result.weights
 

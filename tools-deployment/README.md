@@ -166,3 +166,61 @@ fl_evaluation_timeout: 300
 ```
 
 These can be overridden per run with `-e`, just like `fl_algorithm` and `fl_client_count`.
+
+## FedProx diagnostic
+
+FedProx uses the standard proximal local objective
+`F_k(w) + (mu/2) * ||w - w_global||^2` and the cloud still performs
+sample-weighted FedAvg aggregation. The deployment implementation runs the
+custom proximal `train_step` through Keras `fit()` so the batch loop stays in
+TensorFlow/Keras rather than crossing Python -> TensorFlow once per batch.
+
+On a provisioned client, compare FedAvg, FedProx(mu=0) and the configured
+FedProx value from identical initial weights/seeds:
+
+```bash
+cd ~/Platform-for-prototyping-fl-in-IoT
+.venv-deployment/bin/python tools-deployment/scripts/check_fedprox.py \
+  --data tools2/data/fl_dataset/client_df_RuralIoT_001 \
+  --mu 0.01 --epochs 1 --batch-size 32
+```
+
+`FedProx(mu=0)` should be very close to ordinary local FedAvg training. The
+script prints weight deltas, timings, base loss, the FedProx objective and the
+raw proximal term.
+
+## Run all deployment algorithms and collect results
+
+From the operator laptop, after pushing/updating the remote repository:
+
+```bash
+python tools-deployment/scripts/run_all_experiments.py \
+  --clients 7 \
+  --rounds 5 \
+  --local-epochs 3 \
+  --repetitions 1
+```
+
+By default this runs, sequentially, `FedAvg`, `FedProx`, `FedPAQ`, `FedMA` and
+`HierFedAvg` through the same Ansible launcher. Each experiment is allowed to
+finish before the next begins. The newly-created result directory is copied
+back from `main` and stored under:
+
+```text
+benchmark-results/<UTC timestamp>/
+  manifest.json
+  comparison.csv
+  comparison.md
+  aggregate.csv
+  rep-001-seed-42/
+    FedAvg/<server run directory>/...
+    FedProx/<server run directory>/...
+    FedPAQ/<server run directory>/...
+    FedMA/<server run directory>/...
+    HierFedAvg/<server run directory>/...
+```
+
+Use `--repetitions 3` (or more) for repeated measurements. All algorithms in a
+single repetition receive the same seed; the seed increments between
+repetitions. Important options include `--fedprox-mu`, `--fedpaq-bits`,
+`--edge-count`, `--batch-size` and `--algorithms`.

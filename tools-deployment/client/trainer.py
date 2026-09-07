@@ -19,6 +19,7 @@ class TrainResult:
     final_loss: float | None
     final_accuracy: float | None
     final_objective: float | None = None
+    final_proximal_term: float | None = None
 
 
 @dataclass(frozen=True)
@@ -108,73 +109,109 @@ class LocalTrainer:
         Objective:
             F_k(w) + (mu / 2) * ||w - w_global||^2
 
-        The server still uses FedAvg-style sample-weighted aggregation; FedProx
-        changes the local objective, not the aggregation rule.
+        FedProx changes only the local objective. The cloud still performs the
+        same sample-weighted averaging as FedAvg.
+
+        This implementation intentionally uses ``model.fit`` with a custom
+        Keras ``train_step`` rather than a Python loop over every batch.  The
+        previous deployment implementation was mathematically correct, but
+        paid a Python->TensorFlow call for each batch and made FedProx appear
+        roughly three times slower than FedAvg on the small thesis model.
+        Keeping the loop inside Keras also makes the mu=0 path directly
+        comparable with ordinary FedAvg training (same optimizer, loss, batch
+        size and shuffle semantics).
         """
         if mu < 0:
             raise ValueError("FedProx mu must be non-negative")
 
         import tensorflow as tf
 
-        model = self._fresh_model(global_weights, seed=seed)
-        optimizer = tf.keras.optimizers.Adam()
-        loss_fn = tf.keras.losses.BinaryCrossentropy()
+        base_model = self._fresh_model(global_weights, seed=seed)
+        global_trainable = [tf.constant(v.numpy()) for v in base_model.trainable_variables]
 
-        # After set_weights(), these constants are exactly the trainable global
-        # parameters from the beginning of this federated round.
-        global_trainable = [tf.constant(v.numpy()) for v in model.trainable_variables]
+        class FedProxModel(tf.keras.Model):
+            def __init__(self, *, inputs, outputs, global_reference, prox_mu):
+                super().__init__(inputs=inputs, outputs=outputs, name="FedProxDeploymentModel")
+                self._global_reference = list(global_reference)
+                self._prox_mu = tf.constant(float(prox_mu), dtype=tf.float32)
+                self.base_loss_tracker = tf.keras.metrics.Mean(name="base_loss")
+                self.objective_tracker = tf.keras.metrics.Mean(name="objective")
+                self.proximal_tracker = tf.keras.metrics.Mean(name="proximal_term")
 
-        @tf.function
-        def train_step(x_batch, y_batch):
-            with tf.GradientTape() as tape:
-                predictions = model(x_batch, training=True)
-                base_loss = loss_fn(y_batch, predictions)
-                proximal_term = tf.add_n(
-                    [
+            @property
+            def metrics(self):
+                # Keras resets every object returned here at each epoch.
+                return [
+                    self.base_loss_tracker,
+                    self.objective_tracker,
+                    self.proximal_tracker,
+                    *self.compiled_metrics.metrics,
+                ]
+
+            def train_step(self, data):
+                x_batch, y_batch = data
+                with tf.GradientTape() as tape:
+                    predictions = self(x_batch, training=True)
+                    base_loss = self.compiled_loss(
+                        y_batch, predictions, regularization_losses=self.losses
+                    )
+                    proximal_term = tf.add_n([
                         tf.reduce_sum(tf.square(local_var - global_var))
-                        for local_var, global_var in zip(model.trainable_variables, global_trainable)
-                    ]
-                )
-                objective = base_loss + (tf.cast(mu, base_loss.dtype) / 2.0) * proximal_term
-            gradients = tape.gradient(objective, model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-            return base_loss, objective, predictions
+                        for local_var, global_var in zip(
+                            self.trainable_variables, self._global_reference
+                        )
+                    ])
+                    objective = base_loss + (
+                        tf.cast(self._prox_mu, base_loss.dtype) / 2.0
+                    ) * proximal_term
 
-        dataset = (
-            tf.data.Dataset.from_tensor_slices((self.data.X_train, self.data.y_train))
-            .shuffle(
-                max(1, min(len(self.data.X_train), 10000)),
-                seed=seed,
-                reshuffle_each_iteration=True,
-            )
-            .batch(batch_size)
+                gradients = tape.gradient(objective, self.trainable_variables)
+                self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
+                self.base_loss_tracker.update_state(base_loss)
+                self.objective_tracker.update_state(objective)
+                self.proximal_tracker.update_state(proximal_term)
+                self.compiled_metrics.update_state(y_batch, predictions)
+
+                return {metric.name: metric.result() for metric in self.metrics}
+
+        # Functional wrapper shares the exact variables initialized in
+        # base_model, therefore the global reference above corresponds to the
+        # beginning of this federated round.
+        model = FedProxModel(
+            inputs=base_model.inputs,
+            outputs=base_model.outputs,
+            global_reference=global_trainable,
+            prox_mu=mu,
+        )
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(),
+            loss=tf.keras.losses.BinaryCrossentropy(),
+            metrics=[tf.keras.metrics.BinaryAccuracy(name="accuracy", threshold=0.5)],
         )
 
         started = time.perf_counter()
-        final_base_loss: float | None = None
-        final_objective: float | None = None
-        final_accuracy: float | None = None
-
-        for _epoch in range(local_epochs):
-            mean_base = tf.keras.metrics.Mean()
-            mean_objective = tf.keras.metrics.Mean()
-            accuracy = tf.keras.metrics.BinaryAccuracy(threshold=0.5)
-            for x_batch, y_batch in dataset:
-                base_loss, objective, predictions = train_step(x_batch, y_batch)
-                mean_base.update_state(base_loss)
-                mean_objective.update_state(objective)
-                accuracy.update_state(tf.reshape(y_batch, tf.shape(predictions)), predictions)
-            final_base_loss = float(mean_base.result().numpy())
-            final_objective = float(mean_objective.result().numpy())
-            final_accuracy = float(accuracy.result().numpy())
-
+        history = model.fit(
+            self.data.X_train,
+            self.data.y_train,
+            epochs=local_epochs,
+            batch_size=batch_size,
+            verbose=0,
+            shuffle=True,
+        )
         elapsed = time.perf_counter() - started
+
+        def last(name: str) -> float | None:
+            values = history.history.get(name, [])
+            return float(values[-1]) if values else None
+
         return TrainResult(
             weights=[np.asarray(w) for w in model.get_weights()],
             train_seconds=elapsed,
-            final_loss=final_base_loss,
-            final_accuracy=final_accuracy,
-            final_objective=final_objective,
+            final_loss=last("base_loss"),
+            final_accuracy=last("accuracy"),
+            final_objective=last("objective"),
+            final_proximal_term=last("proximal_term"),
         )
 
     def evaluate(

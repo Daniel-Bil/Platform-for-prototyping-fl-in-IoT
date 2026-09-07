@@ -60,7 +60,7 @@ ROUND_FIELDS = [
 
 PARTICIPANT_FIELDS = [
     "round", "algorithm", "participant_id", "role", "train_samples", "train_seconds",
-    "final_loss", "final_accuracy", "final_objective", "update_wire_bytes",
+    "final_loss", "final_accuracy", "final_objective", "final_proximal_term", "update_wire_bytes",
     "test_samples", "test_loss", "test_accuracy", "tp", "tn", "fp", "fn",
     "eval_seconds", "evaluation_wire_bytes", "child_count", "child_train_samples",
     "edge_child_train_bytes_down", "edge_child_train_bytes_up",
@@ -335,6 +335,7 @@ class FederatedServer:
                             "final_loss": meta.get("final_loss"),
                             "final_accuracy": meta.get("final_accuracy"),
                             "final_objective": meta.get("final_objective"),
+                            "final_proximal_term": meta.get("final_proximal_term"),
                             "update_wire_bytes": int(message.wire_bytes),
                             "child_count": int(meta.get("child_count", 0) or 0),
                             "child_train_samples": int(meta.get("child_train_samples", 0) or 0),
@@ -344,6 +345,11 @@ class FederatedServer:
                         extra = ""
                         if self.algorithm == "HierFedAvg":
                             extra = f" | children {meta.get('child_count', '?')} | samples {aggregation_samples}"
+                        elif self.algorithm == "FedProx":
+                            extra = (
+                                f" | objective {meta.get('final_objective')}"
+                                f" | prox {meta.get('final_proximal_term')}"
+                            )
                         LOG.info(
                             "Round %d: update <- %s | train %.2fs | loss %s%s",
                             round_id,
