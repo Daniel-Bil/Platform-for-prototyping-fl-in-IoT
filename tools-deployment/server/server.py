@@ -36,7 +36,12 @@ if str(DEPLOYMENT_ROOT) not in sys.path:
     sys.path.insert(0, str(DEPLOYMENT_ROOT))
 
 from common.data import DEFAULT_FEATURES
-from common.metrics import aggregate_eval_records
+from common.metrics import (
+    aggregate_eval_records,
+    make_threshold_grid,
+    select_threshold_by_macro_f1,
+    summarize_confusion,
+)
 from common.model import build_model_from_config, load_model_config
 from common.protocol import ConnectionClosed, Message, ProtocolError, recv_message, send_message
 from common.quantization import dequantize_weights
@@ -50,6 +55,10 @@ ROUND_FIELDS = [
     "round", "algorithm", "requested_clients", "cohort_size", "successful_updates", "evaluation_results",
     "client_ids", "successful_client_ids", "logical_client_count", "logical_client_ids",
     "train_samples", "test_samples",
+    "selected_threshold", "validation_samples", "validation_loss", "validation_accuracy",
+    "validation_precision", "validation_recall", "validation_specificity", "validation_f1",
+    "validation_normal_f1", "validation_macro_f1", "validation_tp", "validation_tn",
+    "validation_fp", "validation_fn",
     "round_seconds", "training_phase_seconds", "aggregation_seconds", "evaluation_phase_seconds",
     "test_loss", "accuracy", "precision", "recall", "specificity", "f1", "normal_f1", "macro_f1",
     "tp", "tn", "fp", "fn",
@@ -66,7 +75,9 @@ PARTICIPANT_FIELDS = [
     "train_positive", "val_positive", "test_positive",
     "train_positive_rate", "val_positive_rate", "test_positive_rate",
     "train_seconds", "final_loss", "final_accuracy", "final_objective", "final_proximal_term",
-    "update_wire_bytes", "test_samples", "test_loss", "test_accuracy", "tp", "tn", "fp", "fn",
+    "update_wire_bytes", "selected_threshold", "validation_samples", "validation_loss",
+    "validation_accuracy", "validation_macro_f1", "validation_wire_bytes",
+    "test_samples", "test_loss", "test_accuracy", "tp", "tn", "fp", "fn",
     "eval_seconds", "evaluation_wire_bytes", "child_count", "child_train_samples",
     "edge_aggregation_seconds", "child_ids",
     "edge_child_train_bytes_down", "edge_child_train_bytes_up",
@@ -178,6 +189,13 @@ class FederatedServer:
             "evaluation_timeout": self.args.evaluation_timeout,
             "evaluate_every": self.args.evaluate_every,
             "eval_batch_size": self.args.eval_batch_size,
+            "threshold_selection": {
+                "mode": "validation_macro_f1",
+                "minimum": self.args.threshold_min,
+                "maximum": self.args.threshold_max,
+                "step": self.args.threshold_step,
+                "preferred": self.args.threshold_preferred,
+            },
             "join_window": self.args.join_window,
             "initial_join_window": self.args.initial_join_window,
             "model_path": str(Path(self.args.model).resolve()),
@@ -465,11 +483,117 @@ class FederatedServer:
             return fedma_aggregate(self.global_weights, updates)
         raise RuntimeError(f"unsupported algorithm {self.algorithm}")
 
+    def _collect_threshold_validations(
+        self,
+        cohort: list[ClientSession],
+        successful_ids: list[str],
+        round_id: int,
+        thresholds: list[float],
+    ) -> list[dict[str, Any]]:
+        targets = {
+            p.client_id: p
+            for p in cohort
+            if p.alive and p.client_id in set(successful_ids)
+        }
+        if not targets:
+            return []
+
+        validation_metadata = {
+            "type": "VALIDATE_THRESHOLDS",
+            "round": round_id,
+            "algorithm": self.algorithm,
+            "batch_size": int(self.args.eval_batch_size),
+            "thresholds": [float(value) for value in thresholds],
+            "seed": int(self.args.seed + round_id * 1000 + 400),
+        }
+        for participant_id, session in list(targets.items()):
+            try:
+                session.send(validation_metadata, self.global_weights)
+            except OSError as exc:
+                LOG.warning(
+                    "Round %d: failed to send threshold validation model to %s: %s",
+                    round_id,
+                    participant_id,
+                    exc,
+                )
+                session.close()
+                targets.pop(participant_id, None)
+
+        records: list[dict[str, Any]] = []
+        pending = dict(targets)
+        deadline = time.monotonic() + self.args.evaluation_timeout
+        while pending and time.monotonic() < deadline and not self.shutdown.is_set():
+            progressed = False
+            for participant_id, session in list(pending.items()):
+                if not session.alive:
+                    pending.pop(participant_id, None)
+                    continue
+                try:
+                    message = session.inbox.get_nowait()
+                except queue.Empty:
+                    continue
+                progressed = True
+                meta = message.metadata
+                msg_type = meta.get("type")
+                message_round = int(meta.get("round", -1))
+                if msg_type == "VALIDATION_RESULT" and message_round == round_id:
+                    try:
+                        val_samples = int(meta.get("val_samples", 0))
+                        threshold_counts = meta.get("threshold_counts")
+                        if val_samples <= 0:
+                            raise ProtocolError("validation result must report val_samples > 0")
+                        if not isinstance(threshold_counts, list) or len(threshold_counts) != len(thresholds):
+                            raise ProtocolError("validation threshold grid length mismatch")
+                        for expected, candidate in zip(thresholds, threshold_counts):
+                            if not isinstance(candidate, dict):
+                                raise ProtocolError("invalid validation threshold candidate")
+                            if abs(float(candidate.get("threshold")) - float(expected)) > 1e-8:
+                                raise ProtocolError("validation threshold grid mismatch")
+                            counts = [int(candidate.get(key, -1)) for key in ("tp", "tn", "fp", "fn")]
+                            if min(counts) < 0 or sum(counts) != val_samples:
+                                raise ProtocolError("invalid validation confusion counts")
+                        record = {
+                            "participant_id": participant_id,
+                            "role": session.role,
+                            "val_samples": val_samples,
+                            "val_loss": float(meta["val_loss"]),
+                            "threshold_counts": threshold_counts,
+                            "eval_seconds": float(meta.get("eval_seconds", 0.0)),
+                            "validation_wire_bytes": int(message.wire_bytes),
+                            "edge_child_eval_bytes_down": int(meta.get("edge_child_eval_bytes_down", 0) or 0),
+                            "edge_child_eval_bytes_up": int(meta.get("edge_child_eval_bytes_up", 0) or 0),
+                            "child_validation_records": list(meta.get("child_validation_records", []) or []),
+                        }
+                    except (KeyError, TypeError, ValueError, ProtocolError) as exc:
+                        LOG.warning("Round %d: rejected validation result from %s: %s", round_id, participant_id, exc)
+                    else:
+                        records.append(record)
+                        LOG.info(
+                            "Round %d: validation <- %s | n=%d | candidates=%d",
+                            round_id,
+                            participant_id,
+                            val_samples,
+                            len(threshold_counts),
+                        )
+                    pending.pop(participant_id, None)
+                elif msg_type == "CLIENT_ERROR" and message_round == round_id:
+                    LOG.error("Round %d: validation failed on %s: %s", round_id, participant_id, meta.get("error"))
+                    pending.pop(participant_id, None)
+                else:
+                    LOG.warning("Ignoring unexpected message from %s during validation: %s", participant_id, msg_type)
+            if not progressed:
+                time.sleep(0.05)
+
+        for participant_id in pending:
+            LOG.warning("Round %d: timed out waiting for threshold validation from %s", round_id, participant_id)
+        return records
+
     def _collect_evaluations(
         self,
         cohort: list[ClientSession],
         successful_ids: list[str],
         round_id: int,
+        threshold: float,
     ) -> list[dict[str, Any]]:
         targets = {
             p.client_id: p
@@ -484,6 +608,7 @@ class FederatedServer:
             "round": round_id,
             "algorithm": self.algorithm,
             "batch_size": int(self.args.eval_batch_size),
+            "threshold": float(threshold),
             "seed": int(self.args.seed + round_id * 1000 + 500),
         }
         for participant_id, session in list(targets.items()):
@@ -522,6 +647,7 @@ class FederatedServer:
                         record = {
                             "participant_id": participant_id,
                             "role": session.role,
+                            "selected_threshold": float(meta.get("threshold", threshold)),
                             "test_samples": test_samples,
                             "test_loss": float(meta["test_loss"]),
                             "test_accuracy": float(meta.get("accuracy", (tp + tn) / test_samples)),
@@ -571,19 +697,52 @@ class FederatedServer:
             return None
         return float(positive_i / samples_i) if samples_i > 0 else None
 
+    @staticmethod
+    def _validation_at_threshold(
+        record: dict[str, Any],
+        threshold: float | None,
+    ) -> dict[str, Any]:
+        if threshold is None:
+            return {}
+        candidates = record.get("threshold_counts") or []
+        for candidate in candidates:
+            try:
+                if abs(float(candidate.get("threshold")) - float(threshold)) <= 1e-8:
+                    counts = summarize_confusion(
+                        tp=int(candidate.get("tp", 0)),
+                        tn=int(candidate.get("tn", 0)),
+                        fp=int(candidate.get("fp", 0)),
+                        fn=int(candidate.get("fn", 0)),
+                    )
+                    return counts
+            except (TypeError, ValueError):
+                continue
+        return {}
+
     def _save_participant_rows(
         self,
         round_id: int,
         update_records: list[dict[str, Any]],
+        validation_records: list[dict[str, Any]],
         eval_records: list[dict[str, Any]],
+        selected_threshold: float | None,
     ) -> None:
+        validation_by_id = {record["participant_id"]: record for record in validation_records}
         eval_by_id = {record["participant_id"]: record for record in eval_records}
         for update in update_records:
+            validation_record = validation_by_id.get(update["participant_id"], {})
+            validation_selected = self._validation_at_threshold(validation_record, selected_threshold)
             eval_record = eval_by_id.get(update["participant_id"], {})
             row = {
                 "round": round_id,
                 "algorithm": self.algorithm,
                 **update,
+                "selected_threshold": selected_threshold,
+                "validation_samples": validation_record.get("val_samples"),
+                "validation_loss": validation_record.get("val_loss"),
+                "validation_accuracy": validation_selected.get("accuracy"),
+                "validation_macro_f1": validation_selected.get("macro_f1"),
+                "validation_wire_bytes": validation_record.get("validation_wire_bytes"),
                 **eval_record,
             }
             row["child_ids"] = ";".join(str(x) for x in (update.get("child_ids") or []))
@@ -604,11 +763,21 @@ class FederatedServer:
                 for item in (eval_record.get("child_eval_records") or [])
                 if item.get("client_id") is not None
             }
+            child_validation_by_id = {
+                str(item.get("client_id")): item
+                for item in (validation_record.get("child_validation_records") or [])
+                if item.get("client_id") is not None
+            }
             for child_update in update.get("child_update_records") or []:
                 child_id = str(child_update.get("client_id", ""))
                 if not child_id:
                     continue
                 child_eval = child_eval_by_id.get(child_id, {})
+                child_validation = child_validation_by_id.get(child_id, {})
+                child_validation_selected = self._validation_at_threshold(
+                    child_validation,
+                    selected_threshold,
+                )
                 child_row = {
                     "round": round_id,
                     "algorithm": self.algorithm,
@@ -626,6 +795,12 @@ class FederatedServer:
                     "final_loss": child_update.get("final_loss"),
                     "final_accuracy": child_update.get("final_accuracy"),
                     "update_wire_bytes": child_update.get("wire_bytes"),
+                    "selected_threshold": selected_threshold,
+                    "validation_samples": child_validation.get("val_samples"),
+                    "validation_loss": child_validation.get("val_loss"),
+                    "validation_accuracy": child_validation_selected.get("accuracy"),
+                    "validation_macro_f1": child_validation_selected.get("macro_f1"),
+                    "validation_wire_bytes": child_validation.get("wire_bytes"),
                     "test_samples": child_eval.get("test_samples"),
                     "test_loss": child_eval.get("test_loss"),
                     "test_accuracy": (
@@ -686,7 +861,12 @@ class FederatedServer:
                     key: final.get(key)
                     for key in (
                         "test_samples", "test_loss", "accuracy", "precision", "recall",
-                        "specificity", "f1", "normal_f1", "macro_f1", "tp", "tn", "fp", "fn"
+                        "specificity", "f1", "normal_f1", "macro_f1", "tp", "tn", "fp", "fn",
+                        "selected_threshold", "validation_samples", "validation_loss",
+                        "validation_accuracy", "validation_precision", "validation_recall",
+                        "validation_specificity", "validation_f1", "validation_normal_f1",
+                        "validation_macro_f1", "validation_tp", "validation_tn",
+                        "validation_fp", "validation_fn"
                     )
                 },
                 "total_network_bytes": int(sum(int(r["bytes_total"]) for r in self.round_rows)),
@@ -778,13 +958,75 @@ class FederatedServer:
                     f"Round {round_id} produced no valid updates; aborting experiment"
                 )
 
+            validation_records: list[dict[str, Any]] = []
             eval_records: list[dict[str, Any]] = []
+            selected_threshold: float | None = None
+            validation_metrics: dict[str, Any] = {
+                "test_samples": 0,
+                "accuracy": None,
+                "precision": None,
+                "recall": None,
+                "specificity": None,
+                "f1": None,
+                "normal_f1": None,
+                "macro_f1": None,
+                "tp": 0,
+                "tn": 0,
+                "fp": 0,
+                "fn": 0,
+            }
+            validation_loss: float | None = None
             evaluation_phase_seconds = 0.0
             before_eval_sent = after_train_sent
             before_eval_recv = after_train_recv
             if updates and self.args.evaluate_every > 0 and round_id % self.args.evaluate_every == 0:
                 eval_started = time.perf_counter()
-                eval_records = self._collect_evaluations(cohort, successful_ids, round_id)
+                threshold_grid = make_threshold_grid(
+                    self.args.threshold_min,
+                    self.args.threshold_max,
+                    self.args.threshold_step,
+                )
+                validation_records = self._collect_threshold_validations(
+                    cohort,
+                    successful_ids,
+                    round_id,
+                    threshold_grid,
+                )
+                if not validation_records:
+                    self.failure_reason = f"round_{round_id}_produced_no_validation_results"
+                    self._write_summary()
+                    raise RuntimeError(
+                        f"Round {round_id} produced no valid threshold-validation results"
+                    )
+
+                selected = select_threshold_by_macro_f1(
+                    validation_records,
+                    threshold_grid,
+                    preferred_threshold=float(self.args.threshold_preferred),
+                )
+                selected_threshold = float(selected["threshold"])
+                validation_metrics = dict(selected)
+                validation_total = sum(int(record["val_samples"]) for record in validation_records)
+                validation_loss = (
+                    sum(float(record["val_loss"]) * int(record["val_samples"]) for record in validation_records)
+                    / validation_total
+                    if validation_total
+                    else None
+                )
+                LOG.info(
+                    "Round %d: selected threshold %.3f on validation | n=%d | macro-F1=%.4f | F1=%.4f",
+                    round_id,
+                    selected_threshold,
+                    validation_metrics["test_samples"],
+                    validation_metrics["macro_f1"],
+                    validation_metrics["f1"],
+                )
+                eval_records = self._collect_evaluations(
+                    cohort,
+                    successful_ids,
+                    round_id,
+                    threshold=selected_threshold,
+                )
                 evaluation_phase_seconds = time.perf_counter() - eval_started
             after_eval_sent = sum(p.bytes_sent for p in cohort)
             after_eval_recv = sum(p.bytes_received for p in cohort)
@@ -804,8 +1046,14 @@ class FederatedServer:
             cloud_eval_up = max(0, after_eval_recv - before_eval_recv)
             edge_train_down = sum(int(r.get("edge_child_train_bytes_down", 0)) for r in update_records)
             edge_train_up = sum(int(r.get("edge_child_train_bytes_up", 0)) for r in update_records)
-            edge_eval_down = sum(int(r.get("edge_child_eval_bytes_down", 0)) for r in eval_records)
-            edge_eval_up = sum(int(r.get("edge_child_eval_bytes_up", 0)) for r in eval_records)
+            edge_eval_down = sum(
+                int(r.get("edge_child_eval_bytes_down", 0))
+                for r in [*validation_records, *eval_records]
+            )
+            edge_eval_up = sum(
+                int(r.get("edge_child_eval_bytes_up", 0))
+                for r in [*validation_records, *eval_records]
+            )
             total_train = cloud_train_down + cloud_train_up + edge_train_down + edge_train_up
             total_eval = cloud_eval_down + cloud_eval_up + edge_eval_down + edge_eval_up
 
@@ -832,6 +1080,20 @@ class FederatedServer:
                 "logical_client_ids": ";".join(logical_client_ids),
                 "train_samples": sum(sample_counts),
                 **metrics,
+                "selected_threshold": selected_threshold,
+                "validation_samples": int(validation_metrics.get("test_samples", 0) or 0),
+                "validation_loss": validation_loss,
+                "validation_accuracy": validation_metrics.get("accuracy"),
+                "validation_precision": validation_metrics.get("precision"),
+                "validation_recall": validation_metrics.get("recall"),
+                "validation_specificity": validation_metrics.get("specificity"),
+                "validation_f1": validation_metrics.get("f1"),
+                "validation_normal_f1": validation_metrics.get("normal_f1"),
+                "validation_macro_f1": validation_metrics.get("macro_f1"),
+                "validation_tp": validation_metrics.get("tp"),
+                "validation_tn": validation_metrics.get("tn"),
+                "validation_fp": validation_metrics.get("fp"),
+                "validation_fn": validation_metrics.get("fn"),
                 "round_seconds": round(time.perf_counter() - round_started, 6),
                 "training_phase_seconds": round(training_phase_seconds, 6),
                 "aggregation_seconds": round(aggregation_seconds, 6),
@@ -850,7 +1112,13 @@ class FederatedServer:
             }
             self.round_rows.append(row)
             self._append_csv(self.rounds_csv, ROUND_FIELDS, row)
-            self._save_participant_rows(round_id, update_records, eval_records)
+            self._save_participant_rows(
+                round_id,
+                update_records,
+                validation_records,
+                eval_records,
+                selected_threshold,
+            )
             self._write_summary()
             round_id += 1
 
@@ -916,6 +1184,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--evaluation-timeout", type=float, default=300.0)
     parser.add_argument("--evaluate-every", type=int, default=1, help="0 disables distributed evaluation")
     parser.add_argument("--eval-batch-size", type=int, default=256)
+    parser.add_argument("--threshold-min", type=float, default=0.0, help="Minimum validation threshold candidate")
+    parser.add_argument("--threshold-max", type=float, default=1.0, help="Maximum validation threshold candidate")
+    parser.add_argument("--threshold-step", type=float, default=0.01, help="Validation threshold grid step")
+    parser.add_argument("--threshold-preferred", type=float, default=0.5, help="Tie-break threshold when macro-F1 is equal")
     parser.add_argument("--handshake-timeout", type=float, default=10.0)
     parser.add_argument("--backlog", type=int, default=128)
     parser.add_argument("--results-dir", default=str(DEPLOYMENT_ROOT / "results"))
@@ -930,6 +1202,16 @@ def parse_args() -> argparse.Namespace:
         parser.error("--evaluate-every must be >= 0")
     if args.eval_batch_size <= 0:
         parser.error("--eval-batch-size must be > 0")
+    if not 0.0 <= args.threshold_min <= 1.0:
+        parser.error("--threshold-min must be in [0, 1]")
+    if not 0.0 <= args.threshold_max <= 1.0:
+        parser.error("--threshold-max must be in [0, 1]")
+    if args.threshold_max < args.threshold_min:
+        parser.error("--threshold-max must be >= --threshold-min")
+    if args.threshold_step <= 0:
+        parser.error("--threshold-step must be > 0")
+    if not 0.0 <= args.threshold_preferred <= 1.0:
+        parser.error("--threshold-preferred must be in [0, 1]")
     if args.requested_clients < 0:
         parser.error("--requested-clients must be >= 0")
     if args.repetition is not None and args.repetition < 1:

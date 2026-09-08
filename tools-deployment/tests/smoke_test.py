@@ -18,7 +18,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from common.metrics import aggregate_eval_records, summarize_confusion
+from common.metrics import (
+    aggregate_eval_records,
+    make_threshold_grid,
+    select_threshold_by_macro_f1,
+    summarize_confusion,
+)
 from common.protocol import recv_message, send_message
 from common.quantization import dequantize_weights, quantize_weights
 from server.aggregation import fedma_aggregate, weighted_fedavg
@@ -62,6 +67,10 @@ def server_args(port: int, tmp: str, algorithm: str, rounds: int = 1, evaluate_e
         evaluation_timeout=5.0,
         evaluate_every=evaluate_every,
         eval_batch_size=64,
+        threshold_min=0.05,
+        threshold_max=0.95,
+        threshold_step=0.05,
+        threshold_preferred=0.5,
         handshake_timeout=2.0,
         backlog=16,
         results_dir=tmp,
@@ -112,6 +121,33 @@ def test_metrics() -> None:
     assert combined["test_samples"] == 40
     assert abs(combined["test_loss"] - 0.5) < 1e-9
     assert abs(combined["accuracy"] - 0.8) < 1e-9
+
+    thresholds = [0.3, 0.5, 0.7]
+    selected = select_threshold_by_macro_f1([
+        {
+            "threshold_counts": [
+                {"threshold": 0.3, "tp": 8, "tn": 2, "fp": 8, "fn": 2},
+                {"threshold": 0.5, "tp": 7, "tn": 8, "fp": 2, "fn": 3},
+                {"threshold": 0.7, "tp": 2, "tn": 10, "fp": 0, "fn": 8},
+            ]
+        }
+    ], thresholds)
+    assert abs(float(selected["threshold"]) - 0.5) < 1e-9
+    assert make_threshold_grid(0.1, 0.3, 0.1) == [0.1, 0.2, 0.3]
+
+    # Regression for the real-data sanity run: a fixed 0.5 threshold can
+    # collapse to the majority class even when lower probability scores still
+    # separate anomalies well. Validation macro-F1 must pick the useful lower
+    # threshold instead of silently accepting the all-normal classifier.
+    rescued = select_threshold_by_macro_f1([
+        {
+            "threshold_counts": [
+                {"threshold": 0.1, "tp": 4, "tn": 14, "fp": 1, "fn": 1},
+                {"threshold": 0.5, "tp": 0, "tn": 15, "fp": 0, "fn": 5},
+            ]
+        }
+    ], [0.1, 0.5])
+    assert abs(float(rescued["threshold"]) - 0.1) < 1e-9
 
 
 def test_fedpaq_quantization_and_wire_reduction() -> None:
@@ -186,6 +222,18 @@ def test_distributed_evaluation_and_result_files() -> None:
                     "algorithm": "FedAvg", "train_seconds": 0.01,
                     "final_loss": 0.1, "final_accuracy": 0.9,
                 }, [message.arrays[0] + delta])
+            elif msg_type == "VALIDATE_THRESHOLDS":
+                tp, tn, fp, fn = counts
+                n = tp + tn + fp + fn
+                threshold_counts = [
+                    {"threshold": float(t), "tp": tp, "tn": tn, "fp": fp, "fn": fn}
+                    for t in message.metadata["thresholds"]
+                ]
+                send_message(sock, {
+                    "type": "VALIDATION_RESULT", "round": round_id, "client_id": client_id,
+                    "algorithm": "FedAvg", "val_samples": n, "val_loss": loss,
+                    "threshold_counts": threshold_counts, "eval_seconds": 0.01,
+                })
             elif msg_type == "EVALUATE":
                 tp, tn, fp, fn = counts
                 n = tp + tn + fp + fn
@@ -214,6 +262,8 @@ def test_distributed_evaluation_and_result_files() -> None:
         assert row["test_samples"] == 40
         assert abs(row["test_loss"] - 0.5) < 1e-9
         assert abs(row["accuracy"] - 0.8) < 1e-9
+        assert abs(float(row["selected_threshold"]) - 0.5) < 1e-9
+        assert abs(float(row["validation_macro_f1"]) - 0.8) < 1e-9
         assert row["bytes_total_train"] > 0
         assert row["bytes_total_eval"] > 0
 
@@ -273,8 +323,28 @@ def test_hierfedavg_sample_weighted_edge_path() -> None:
                 "type": "UPDATE", "round": round_id,
                 "client_id": client_id, "algorithm": "HierFedAvg", "train_seconds": 0.01,
             }, [train.arrays[0] + delta])
+            validate = recv_message(sock)
+            assert validate.metadata["type"] == "VALIDATE_THRESHOLDS"
+            thresholds = [float(value) for value in validate.metadata["thresholds"]]
+            # Same balanced 80%-accurate confusion matrix for every candidate;
+            # the cloud tie-break therefore selects 0.5.
+            val_n = samples
+            val_tp = int(val_n * 0.4)
+            val_tn = int(val_n * 0.4)
+            val_fp = int(val_n * 0.1)
+            val_fn = val_n - val_tp - val_tn - val_fp
+            send_message(sock, {
+                "type": "VALIDATION_RESULT", "round": round_id, "client_id": client_id,
+                "algorithm": "HierFedAvg", "val_samples": val_n, "val_loss": 0.5,
+                "threshold_counts": [
+                    {"threshold": t, "tp": val_tp, "tn": val_tn, "fp": val_fp, "fn": val_fn}
+                    for t in thresholds
+                ],
+                "eval_seconds": 0.01,
+            })
             evaluate = recv_message(sock)
             assert evaluate.metadata["type"] == "EVALUATE"
+            assert abs(float(evaluate.metadata["threshold"]) - 0.5) < 1e-9
             # 80% accuracy on each child, with test size mirroring its train weight.
             test_n = samples
             tp = int(test_n * 0.4)

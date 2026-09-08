@@ -187,15 +187,64 @@ def run(args: argparse.Namespace) -> int:
                     )
                 continue
 
+            if msg_type == "VALIDATE_THRESHOLDS":
+                round_id = int(meta["round"])
+                try:
+                    if not message.arrays:
+                        raise ProtocolError("VALIDATE_THRESHOLDS message has no global weights")
+                    thresholds = [float(value) for value in meta.get("thresholds", [])]
+                    eval_seed = _client_seed(int(meta.get("seed", base_seed)), args.client_id)
+                    result = trainer.validate_thresholds(
+                        message.arrays,
+                        thresholds=thresholds,
+                        batch_size=int(meta.get("batch_size", 256)),
+                        seed=eval_seed,
+                    )
+                    wire_bytes = send_message(
+                        sock,
+                        {
+                            "type": "VALIDATION_RESULT",
+                            "round": round_id,
+                            "client_id": args.client_id,
+                            "algorithm": server_algorithm,
+                            "val_samples": result.val_samples,
+                            "val_loss": result.val_loss,
+                            "threshold_counts": result.threshold_counts,
+                            "eval_seconds": round(result.eval_seconds, 6),
+                        },
+                    )
+                    LOG.info(
+                        "Round %d: validation threshold statistics sent (n=%d, candidates=%d, wire %.1f KiB)",
+                        round_id,
+                        result.val_samples,
+                        len(result.threshold_counts),
+                        wire_bytes / 1024.0,
+                    )
+                except Exception as exc:
+                    LOG.exception("Round %d threshold validation failed", round_id)
+                    send_message(
+                        sock,
+                        {
+                            "type": "CLIENT_ERROR",
+                            "phase": "validate_thresholds",
+                            "round": round_id,
+                            "client_id": args.client_id,
+                            "error": f"{type(exc).__name__}: {exc}",
+                        },
+                    )
+                continue
+
             if msg_type == "EVALUATE":
                 round_id = int(meta["round"])
                 try:
                     if not message.arrays:
                         raise ProtocolError("EVALUATE message has no global weights")
+                    threshold = float(meta.get("threshold", 0.5))
                     eval_seed = _client_seed(int(meta.get("seed", base_seed)), args.client_id)
                     result = trainer.evaluate(
                         message.arrays,
                         batch_size=int(meta.get("batch_size", 256)),
+                        threshold=threshold,
                         seed=eval_seed,
                     )
                     wire_bytes = send_message(
@@ -205,6 +254,7 @@ def run(args: argparse.Namespace) -> int:
                             "round": round_id,
                             "client_id": args.client_id,
                             "algorithm": server_algorithm,
+                            "threshold": threshold,
                             "test_samples": result.test_samples,
                             "test_loss": result.test_loss,
                             "accuracy": result.accuracy,
@@ -216,8 +266,9 @@ def run(args: argparse.Namespace) -> int:
                         },
                     )
                     LOG.info(
-                        "Round %d: global evaluation sent (n=%d, acc=%.4f, wire %.1f KiB)",
+                        "Round %d: global evaluation sent (threshold=%.3f, n=%d, acc=%.4f, wire %.1f KiB)",
                         round_id,
+                        threshold,
                         result.test_samples,
                         result.accuracy,
                         wire_bytes / 1024.0,

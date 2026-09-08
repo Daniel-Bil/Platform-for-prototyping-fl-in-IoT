@@ -7,7 +7,8 @@ from typing import Any
 
 CORE_RUN_METRICS = [
     "final_test_loss", "final_accuracy", "final_precision", "final_recall",
-    "final_f1", "final_macro_f1", "total_network_mib", "total_round_seconds",
+    "final_f1", "final_macro_f1", "final_selected_threshold", "final_validation_macro_f1",
+    "total_network_mib", "total_round_seconds",
     "mean_round_seconds", "mean_training_phase_seconds", "mean_aggregation_seconds",
     "server_wall_seconds", "mean_client_train_seconds", "max_client_train_seconds",
 ]
@@ -51,6 +52,10 @@ def collect(campaign: Path):
             "completed_rounds": summary.get("completed_rounds"), "git_commit": config.get("git_commit"),
             "final_test_loss": fm.get("test_loss"), "final_accuracy": fm.get("accuracy"), "final_precision": fm.get("precision"),
             "final_recall": fm.get("recall"), "final_f1": fm.get("f1"), "final_macro_f1": fm.get("macro_f1"),
+            "final_selected_threshold": fm.get("selected_threshold"),
+            "final_validation_macro_f1": fm.get("validation_macro_f1"),
+            "final_validation_f1": fm.get("validation_f1"),
+            "final_validation_accuracy": fm.get("validation_accuracy"),
             "final_tp": fm.get("tp"), "final_tn": fm.get("tn"), "final_fp": fm.get("fp"), "final_fn": fm.get("fn"),
             "total_network_bytes": summary.get("total_network_bytes"),
             "total_network_mib": None if summary.get("total_network_bytes") is None else float(summary["total_network_bytes"])/(1024**2),
@@ -87,7 +92,7 @@ def group_summary(runs):
 def round_summary(rows):
     out=[]
     keys=sorted({(r["algorithm"],int(r["requested_clients"]),int(r["round"])) for r in rows}, key=lambda x:(x[1],x[0],x[2]))
-    metrics=["f1","macro_f1","accuracy","test_loss","round_seconds","training_phase_seconds","aggregation_seconds","bytes_total"]
+    metrics=["f1","macro_f1","accuracy","test_loss","selected_threshold","validation_macro_f1","validation_f1","round_seconds","training_phase_seconds","aggregation_seconds","bytes_total"]
     for alg,c,rnd in keys:
         g=[r for r in rows if r["algorithm"]==alg and int(r["requested_clients"])==c and int(r["round"])==rnd]
         row={"algorithm":alg,"requested_clients":c,"round":rnd,"runs":len(g)}
@@ -103,7 +108,7 @@ def participant_summary(rows):
     for alg,c,pid in keys:
         g=[r for r in client_rows if r["algorithm"]==alg and int(r["requested_clients"])==c and r.get("participant_id")==pid]
         row={"algorithm":alg,"requested_clients":c,"participant_id":pid,"rows":len(g),"dataset_name":next((x.get("dataset_name") for x in g if x.get("dataset_name")),None)}
-        for m in ["train_seconds","final_loss","final_accuracy","test_accuracy","train_positive_rate","test_positive_rate","update_wire_bytes"]:
+        for m in ["train_seconds","final_loss","final_accuracy","selected_threshold","validation_accuracy","validation_macro_f1","test_accuracy","train_positive_rate","test_positive_rate","update_wire_bytes"]:
             vals=[num(x.get(m)) for x in g]; vals=[v for v in vals if v is not None]
             row[m+"_mean"]=statistics.mean(vals) if vals else None; row[m+"_stdev"]=statistics.stdev(vals) if len(vals)>1 else (0.0 if vals else None)
         out.append(row)

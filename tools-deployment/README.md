@@ -17,9 +17,18 @@ There is no configured client count in the Python server. Every round snapshots 
 
 ## Federated evaluation
 
-After each successful aggregation (configurable with `--evaluate-every`) the cloud sends the new global model back to the successful participants for evaluation.
+After each successful aggregation (configurable with `--evaluate-every`) the
+cloud first selects the binary decision threshold on the **validation** splits,
+then evaluates the same global model on the **test** splits.
 
-Raw test data and predictions never leave a client. Each client returns only:
+Threshold selection is distributed: every client evaluates a common candidate
+grid locally and returns only TP/TN/FP/FN counts for each candidate. The cloud
+sums those counts, chooses the threshold with the highest global validation
+macro-F1, and sends that single threshold back for test evaluation. Test labels
+are never used to tune the threshold.
+
+Raw validation/test data and predictions never leave a client. Each client
+returns only sufficient statistics:
 
 - test sample count,
 - binary cross-entropy loss,
@@ -28,7 +37,9 @@ Raw test data and predictions never leave a client. Each client returns only:
 
 The cloud reconstructs exact aggregate accuracy, precision, recall, specificity, anomaly F1, normal-class F1 and macro F1 from those sufficient statistics.
 
-For `HierFedAvg`, evaluation also follows cloud -> edge -> client and the edge aggregates its children's sufficient statistics before returning them to the cloud.
+For `HierFedAvg`, validation and test evaluation also follow cloud -> edge ->
+client and the edge aggregates its children's sufficient statistics before
+returning them to the cloud.
 
 ## Layout
 
@@ -84,7 +95,7 @@ python client/client.py \
   --server 192.168.2.231 \
   --port 8090 \
   --client-id device-1 \
-  --data ../tools2/data/fl_dataset/client_df_RuralIoT_001
+  --data ../tools2/data/fl_dataset_real/client_df_RuralIoT_001
 ```
 
 FedProx parameter:
@@ -134,6 +145,7 @@ One row per global round, including:
 
 - cohort and successful participant counts,
 - represented train/test samples,
+- validation-selected classification threshold and validation macro-F1,
 - global test loss,
 - accuracy / precision / recall / specificity,
 - anomaly F1 / normal F1 / macro F1,
@@ -163,6 +175,10 @@ fl_seed: 42
 fl_evaluate_every: 1
 fl_eval_batch_size: 256
 fl_evaluation_timeout: 300
+fl_threshold_min: 0.0
+fl_threshold_max: 1.0
+fl_threshold_step: 0.01
+fl_threshold_preferred: 0.5
 ```
 
 These can be overridden per run with `-e`, just like `fl_algorithm` and `fl_client_count`.

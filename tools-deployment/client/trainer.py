@@ -34,6 +34,14 @@ class EvalResult:
     eval_seconds: float
 
 
+@dataclass(frozen=True)
+class ThresholdValidationResult:
+    val_samples: int
+    val_loss: float
+    threshold_counts: list[dict[str, float | int]]
+    eval_seconds: float
+
+
 class LocalTrainer:
     """Runs local FL work with a fresh optimizer/model for every operation."""
 
@@ -238,6 +246,7 @@ class LocalTrainer:
         self,
         global_weights: Sequence[np.ndarray],
         batch_size: int = 256,
+        threshold: float = 0.5,
         seed: int | None = None,
     ) -> EvalResult:
         """Evaluate the global model locally and return only sufficient statistics.
@@ -248,6 +257,8 @@ class LocalTrainer:
         """
         if len(self.data.X_test) == 0:
             raise ValueError("test split contains no sequences")
+        if not 0.0 <= threshold <= 1.0:
+            raise ValueError("evaluation threshold must be in [0, 1]")
 
         model = self._fresh_model(global_weights, seed=seed)
         started = time.perf_counter()
@@ -259,7 +270,7 @@ class LocalTrainer:
         y_true = np.asarray(self.data.y_test).reshape(-1).astype(np.int64)
         if probabilities.shape[0] != y_true.shape[0]:
             raise RuntimeError("prediction count does not match test labels")
-        y_pred = (probabilities >= 0.5).astype(np.int64)
+        y_pred = (probabilities >= float(threshold)).astype(np.int64)
 
         tp = int(np.sum((y_true == 1) & (y_pred == 1)))
         tn = int(np.sum((y_true == 0) & (y_pred == 0)))
@@ -282,5 +293,62 @@ class LocalTrainer:
             tn=tn,
             fp=fp,
             fn=fn,
+            eval_seconds=elapsed,
+        )
+
+    def validate_thresholds(
+        self,
+        global_weights: Sequence[np.ndarray],
+        thresholds: Sequence[float],
+        batch_size: int = 256,
+        seed: int | None = None,
+    ) -> ThresholdValidationResult:
+        """Score a threshold grid on the local validation set.
+
+        Only confusion counts for each threshold are returned.  Prediction
+        vectors and validation samples remain local to the client.
+        """
+        if len(self.data.X_val) == 0:
+            raise ValueError("validation split contains no sequences")
+        thresholds = [float(value) for value in thresholds]
+        if not thresholds:
+            raise ValueError("validation threshold grid is empty")
+        if any(value < 0.0 or value > 1.0 for value in thresholds):
+            raise ValueError("validation thresholds must be in [0, 1]")
+
+        model = self._fresh_model(global_weights, seed=seed)
+        started = time.perf_counter()
+        probabilities = np.asarray(
+            model.predict(self.data.X_val, batch_size=batch_size, verbose=0)
+        ).reshape(-1)
+        elapsed = time.perf_counter() - started
+
+        y_true = np.asarray(self.data.y_val).reshape(-1).astype(np.int64)
+        if probabilities.shape[0] != y_true.shape[0]:
+            raise RuntimeError("validation prediction count does not match labels")
+
+        counts: list[dict[str, float | int]] = []
+        for threshold in thresholds:
+            y_pred = (probabilities >= threshold).astype(np.int64)
+            tp = int(np.sum((y_true == 1) & (y_pred == 1)))
+            tn = int(np.sum((y_true == 0) & (y_pred == 0)))
+            fp = int(np.sum((y_true == 0) & (y_pred == 1)))
+            fn = int(np.sum((y_true == 1) & (y_pred == 0)))
+            counts.append({
+                "threshold": float(threshold),
+                "tp": tp,
+                "tn": tn,
+                "fp": fp,
+                "fn": fn,
+            })
+
+        eps = np.finfo(np.float32).eps
+        clipped = np.clip(probabilities.astype(np.float64), eps, 1.0 - eps)
+        truth = y_true.astype(np.float64)
+        val_loss = float(-np.mean(truth * np.log(clipped) + (1.0 - truth) * np.log(1.0 - clipped)))
+        return ThresholdValidationResult(
+            val_samples=int(len(y_true)),
+            val_loss=val_loss,
+            threshold_counts=counts,
             eval_seconds=elapsed,
         )

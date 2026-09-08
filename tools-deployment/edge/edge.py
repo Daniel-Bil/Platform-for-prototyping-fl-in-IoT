@@ -24,7 +24,7 @@ DEPLOYMENT_ROOT = Path(__file__).resolve().parents[1]
 if str(DEPLOYMENT_ROOT) not in sys.path:
     sys.path.insert(0, str(DEPLOYMENT_ROOT))
 
-from common.metrics import aggregate_eval_records
+from common.metrics import aggregate_eval_records, aggregate_threshold_records
 from common.protocol import ConnectionClosed, Message, ProtocolError, recv_message, send_message
 from common.sessions import ClientRegistry, ClientSession
 from server.aggregation import weighted_fedavg
@@ -394,6 +394,146 @@ class HierFedAvgEdge:
             LOG.warning("Round %d: timed out waiting for child evaluation %s", round_id, client_id)
         return records
 
+    def _collect_child_validations(
+        self,
+        cohort: list[ClientSession],
+        round_id: int,
+        thresholds: list[float],
+    ) -> list[dict[str, Any]]:
+        pending = {child.client_id: child for child in cohort if child.alive}
+        records: list[dict[str, Any]] = []
+        deadline = time.monotonic() + self.args.round_timeout
+        while pending and time.monotonic() < deadline and not self.shutdown.is_set():
+            progressed = False
+            for client_id, session in list(pending.items()):
+                if not session.alive:
+                    pending.pop(client_id, None)
+                    continue
+                try:
+                    message = session.inbox.get_nowait()
+                except queue.Empty:
+                    continue
+                progressed = True
+                meta = message.metadata
+                if meta.get("type") == "VALIDATION_RESULT" and int(meta.get("round", -1)) == round_id:
+                    try:
+                        n = int(meta.get("val_samples", 0))
+                        candidates = meta.get("threshold_counts")
+                        if n <= 0 or not isinstance(candidates, list) or len(candidates) != len(thresholds):
+                            raise ProtocolError("invalid child validation result")
+                        for expected, candidate in zip(thresholds, candidates):
+                            if not isinstance(candidate, dict):
+                                raise ProtocolError("invalid child threshold candidate")
+                            if abs(float(candidate.get("threshold")) - float(expected)) > 1e-8:
+                                raise ProtocolError("child threshold grid mismatch")
+                            counts = [int(candidate.get(key, -1)) for key in ("tp", "tn", "fp", "fn")]
+                            if min(counts) < 0 or sum(counts) != n:
+                                raise ProtocolError("invalid child validation confusion counts")
+                        records.append({
+                            "client_id": client_id,
+                            "dataset_name": session.profile.get("dataset_name"),
+                            "val_samples": n,
+                            "val_loss": float(meta["val_loss"]),
+                            "threshold_counts": candidates,
+                            "eval_seconds": float(meta.get("eval_seconds", 0.0)),
+                            "wire_bytes": int(message.wire_bytes),
+                        })
+                    except (KeyError, TypeError, ValueError, ProtocolError) as exc:
+                        LOG.warning("Round %d: rejected child validation from %s: %s", round_id, client_id, exc)
+                    pending.pop(client_id, None)
+                elif meta.get("type") == "CLIENT_ERROR" and int(meta.get("round", -1)) == round_id:
+                    LOG.error("Round %d: child %s validation failed: %s", round_id, client_id, meta.get("error"))
+                    pending.pop(client_id, None)
+                else:
+                    LOG.warning("Ignoring unexpected child message from %s during validation: %s", client_id, meta.get("type"))
+            if not progressed:
+                time.sleep(0.05)
+        for client_id in pending:
+            LOG.warning("Round %d: timed out waiting for child validation %s", round_id, client_id)
+        return records
+
+    def _run_cloud_threshold_validation(self, message: Message) -> None:
+        assert self.cloud_sock is not None
+        meta = message.metadata
+        round_id = int(meta["round"])
+        global_weights = [np.asarray(value) for value in message.arrays]
+        if not global_weights:
+            raise ProtocolError("cloud VALIDATE_THRESHOLDS contains no global weights")
+        thresholds = [float(value) for value in meta.get("thresholds", [])]
+        if not thresholds:
+            raise ProtocolError("cloud threshold grid is empty")
+
+        successful_ids = set(self.round_successful_children.get(round_id, []))
+        cohort = [c for c in self.registry.snapshot() if c.client_id in successful_ids]
+        if not cohort:
+            send_message(self.cloud_sock, {
+                "type": "CLIENT_ERROR", "phase": "validate_thresholds", "round": round_id,
+                "client_id": self.args.edge_id, "error": "no successful child clients available for validation",
+            })
+            return
+
+        before_sent = sum(child.bytes_sent for child in cohort)
+        before_recv = sum(child.bytes_received for child in cohort)
+        validation_meta = {
+            "type": "VALIDATE_THRESHOLDS",
+            "round": round_id,
+            "algorithm": "HierFedAvg",
+            "batch_size": int(meta.get("batch_size", 256)),
+            "thresholds": thresholds,
+            "seed": int(meta.get("seed", self.seed + round_id * 1000 + 400)),
+        }
+        for child in cohort:
+            try:
+                child.send(validation_meta, global_weights)
+            except OSError as exc:
+                LOG.warning("Round %d: failed to send validation to child %s: %s", round_id, child.client_id, exc)
+                child.close()
+
+        started = time.perf_counter()
+        records = self._collect_child_validations(cohort, round_id, thresholds)
+        after_sent = sum(child.bytes_sent for child in cohort)
+        after_recv = sum(child.bytes_received for child in cohort)
+        if not records:
+            send_message(self.cloud_sock, {
+                "type": "CLIENT_ERROR", "phase": "validate_thresholds", "round": round_id,
+                "client_id": self.args.edge_id, "error": "edge received no valid child validations",
+            })
+            return
+
+        aggregated = aggregate_threshold_records(records, thresholds)
+        total_samples = sum(int(record["val_samples"]) for record in records)
+        val_loss = sum(float(record["val_loss"]) * int(record["val_samples"]) for record in records) / total_samples
+        threshold_counts = [
+            {
+                "threshold": row["threshold"],
+                "tp": row["tp"], "tn": row["tn"], "fp": row["fp"], "fn": row["fn"],
+            }
+            for row in aggregated
+        ]
+        send_message(
+            self.cloud_sock,
+            {
+                "type": "VALIDATION_RESULT",
+                "round": round_id,
+                "client_id": self.args.edge_id,
+                "algorithm": "HierFedAvg",
+                "val_samples": total_samples,
+                "val_loss": val_loss,
+                "threshold_counts": threshold_counts,
+                "eval_seconds": round(time.perf_counter() - started, 6),
+                "child_count": len(records),
+                "edge_child_eval_bytes_down": max(0, after_sent - before_sent),
+                "edge_child_eval_bytes_up": max(0, after_recv - before_recv),
+                "child_validation_records": records,
+            },
+        )
+        LOG.info(
+            "Round %d: edge validation -> cloud (n=%d, candidates=%d)",
+            round_id,
+            total_samples,
+            len(threshold_counts),
+        )
+
     def _run_cloud_evaluation(self, message: Message) -> None:
         assert self.cloud_sock is not None
         meta = message.metadata
@@ -418,6 +558,7 @@ class HierFedAvgEdge:
             "round": round_id,
             "algorithm": "HierFedAvg",
             "batch_size": int(meta.get("batch_size", 256)),
+            "threshold": float(meta.get("threshold", 0.5)),
             "seed": int(meta.get("seed", self.seed + round_id * 1000 + 500)),
         }
         for child in cohort:
@@ -446,6 +587,7 @@ class HierFedAvgEdge:
                 "round": round_id,
                 "client_id": self.args.edge_id,
                 "algorithm": "HierFedAvg",
+                "threshold": float(meta.get("threshold", 0.5)),
                 "test_samples": metrics["test_samples"],
                 "test_loss": metrics["test_loss"],
                 "accuracy": metrics["accuracy"],
@@ -496,6 +638,8 @@ class HierFedAvgEdge:
             try:
                 if msg_type == "TRAIN":
                     self._run_cloud_round(message)
+                elif msg_type == "VALIDATE_THRESHOLDS":
+                    self._run_cloud_threshold_validation(message)
                 elif msg_type == "EVALUATE":
                     self._run_cloud_evaluation(message)
                 else:

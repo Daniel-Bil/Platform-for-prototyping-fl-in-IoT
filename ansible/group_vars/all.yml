@@ -36,6 +36,13 @@ fl_round_timeout: 300
 fl_evaluation_timeout: 300
 fl_evaluate_every: 1
 fl_eval_batch_size: 256
+# Global classification threshold is selected independently in every evaluated
+# round from distributed validation confusion counts. Test labels are never
+# used to tune this threshold.
+fl_threshold_min: 0.0
+fl_threshold_max: 1.0
+fl_threshold_step: 0.01
+fl_threshold_preferred: 0.5
 fl_seed: 42
 fl_model_path: "{{ deployment_dir }}/config/default_model.json"
 
