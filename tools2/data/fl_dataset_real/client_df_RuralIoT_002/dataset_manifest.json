@@ -1,0 +1,105 @@
+{
+  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "sensor_id": "df_RuralIoT_002",
+  "client_dir": "client_df_RuralIoT_002",
+  "source_kind": "cleaned_real_ruraliot",
+  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_002_CLEANED.csv",
+  "fault_profile": "temperature_bias",
+  "target_anomaly_rate": 0.25,
+  "seed": 42,
+  "split_before_fault_injection": true,
+  "features": [
+    "value_temp",
+    "value_hum",
+    "value_acid",
+    "value_PV"
+  ],
+  "cadence_minutes": 10,
+  "source_valid_run_start": 4275,
+  "source_valid_run_end_exclusive": 6938,
+  "source_valid_run_rows": 2663,
+  "selected_start_row": 5126,
+  "selected_rows": 960,
+  "selected_start_time": "2023-05-03T02:10:00+00:00",
+  "selected_end_time": "2023-05-09T18:00:00+00:00",
+  "splits": {
+    "train": {
+      "rows": 672,
+      "normal_rows": 504,
+      "anomaly_rows": 168,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          4,
+          25
+        ],
+        [
+          172,
+          192
+        ],
+        [
+          306,
+          318
+        ],
+        [
+          322,
+          349
+        ],
+        [
+          362,
+          382
+        ],
+        [
+          560,
+          575
+        ],
+        [
+          588,
+          611
+        ],
+        [
+          627,
+          657
+        ]
+      ],
+      "start_time": "2023-05-03T02:10:00+00:00",
+      "end_time": "2023-05-07T18:00:00+00:00"
+    },
+    "val": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          60,
+          93
+        ],
+        [
+          99,
+          102
+        ]
+      ],
+      "start_time": "2023-05-07T18:10:00+00:00",
+      "end_time": "2023-05-08T18:00:00+00:00"
+    },
+    "test": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          9,
+          42
+        ],
+        [
+          89,
+          92
+        ]
+      ],
+      "start_time": "2023-05-08T18:10:00+00:00",
+      "end_time": "2023-05-09T18:00:00+00:00"
+    }
+  }
+}

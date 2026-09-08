@@ -1,0 +1,101 @@
+{
+  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "sensor_id": "df_RuralIoT_001",
+  "client_dir": "client_df_RuralIoT_001",
+  "source_kind": "cleaned_real_ruraliot",
+  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_001_CLEANED.csv",
+  "fault_profile": "temperature_drift",
+  "target_anomaly_rate": 0.25,
+  "seed": 42,
+  "split_before_fault_injection": true,
+  "features": [
+    "value_temp",
+    "value_hum",
+    "value_acid",
+    "value_PV"
+  ],
+  "cadence_minutes": 10,
+  "source_valid_run_start": 8741,
+  "source_valid_run_end_exclusive": 9724,
+  "source_valid_run_rows": 983,
+  "selected_start_row": 8752,
+  "selected_rows": 960,
+  "selected_start_time": "2023-06-07T06:30:00+00:00",
+  "selected_end_time": "2023-06-13T22:20:00+00:00",
+  "splits": {
+    "train": {
+      "rows": 672,
+      "normal_rows": 504,
+      "anomaly_rows": 168,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          46,
+          59
+        ],
+        [
+          209,
+          243
+        ],
+        [
+          245,
+          280
+        ],
+        [
+          391,
+          426
+        ],
+        [
+          430,
+          458
+        ],
+        [
+          518,
+          521
+        ],
+        [
+          643,
+          663
+        ]
+      ],
+      "start_time": "2023-06-07T06:30:00+00:00",
+      "end_time": "2023-06-11T22:20:00+00:00"
+    },
+    "val": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          73,
+          86
+        ],
+        [
+          100,
+          123
+        ]
+      ],
+      "start_time": "2023-06-11T22:30:00+00:00",
+      "end_time": "2023-06-12T22:20:00+00:00"
+    },
+    "test": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          29,
+          57
+        ],
+        [
+          126,
+          134
+        ]
+      ],
+      "start_time": "2023-06-12T22:30:00+00:00",
+      "end_time": "2023-06-13T22:20:00+00:00"
+    }
+  }
+}

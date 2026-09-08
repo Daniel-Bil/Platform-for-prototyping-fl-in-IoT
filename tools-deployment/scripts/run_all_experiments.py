@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run a reproducible thesis benchmark matrix via Ansible and collect results."""
 from __future__ import annotations
-import argparse,csv,json,shutil,subprocess,sys,time
+import argparse,csv,hashlib,json,shutil,subprocess,sys,time
 from datetime import datetime,timezone
 from pathlib import Path
 
@@ -72,7 +72,13 @@ def main():
         counts=[int(x) for x in manifest["client_counts"]]; algs=list(manifest["algorithms"]); a.rounds=int(manifest["rounds"]); a.local_epochs=int(manifest["local_epochs"]); a.batch_size=int(manifest["batch_size"]); a.repetitions=int(manifest["repetitions"]); a.seed=int(manifest["base_seed"]); a.fedprox_mu=float(manifest["fedprox_mu"]); a.fedpaq_bits=int(manifest["fedpaq_bits"]); a.edge_count=int(manifest["edge_count"]); a.initial_join_window=float(manifest.get("initial_join_window",8.0)); a.join_window=float(manifest.get("join_window",.25))
     else:
         campaign_id=datetime.now(timezone.utc).strftime("campaign-%Y%m%dT%H%M%SZ"); campaign=(root/a.output_root/campaign_id).resolve();campaign.mkdir(parents=True,exist_ok=False)
-        manifest={"campaign_id":campaign_id,"created_utc":datetime.now(timezone.utc).isoformat(),"algorithms":algs,"client_counts":counts,"rounds":a.rounds,"local_epochs":a.local_epochs,"batch_size":a.batch_size,"repetitions":a.repetitions,"base_seed":a.seed,"fedprox_mu":a.fedprox_mu,"fedpaq_bits":a.fedpaq_bits,"edge_count":a.edge_count,"initial_join_window":a.initial_join_window,"join_window":a.join_window}
+        dataset_manifest_path=root/"tools2/data/fl_dataset_real/dataset_manifest.json"
+        dataset_info={"path":str(dataset_manifest_path.relative_to(root))}
+        if dataset_manifest_path.exists():
+            raw=dataset_manifest_path.read_bytes()
+            dataset_info.update(json.loads(raw.decode("utf-8")))
+            dataset_info["manifest_sha256"]=hashlib.sha256(raw).hexdigest()
+        manifest={"campaign_id":campaign_id,"created_utc":datetime.now(timezone.utc).isoformat(),"algorithms":algs,"client_counts":counts,"rounds":a.rounds,"local_epochs":a.local_epochs,"batch_size":a.batch_size,"repetitions":a.repetitions,"base_seed":a.seed,"fedprox_mu":a.fedprox_mu,"fedpaq_bits":a.fedpaq_bits,"edge_count":a.edge_count,"initial_join_window":a.initial_join_window,"join_window":a.join_window,"dataset":dataset_info}
         (campaign/"manifest.json").write_text(json.dumps(manifest,indent=2))
     status_path=campaign/"campaign_status.csv"; statuses=load_status(status_path)
     done={(r.get("algorithm"),int(r.get("requested_clients",0)),int(r.get("repetition",0))) for r in statuses if r.get("status")=="completed"}

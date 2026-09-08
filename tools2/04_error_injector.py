@@ -1,3 +1,9 @@
+"""LEGACY synthetic-data fault injector.
+
+Kept for optional VAE/synthetic demonstrations.  The final thesis benchmark is
+prepared by ``05_prepare_fl_dataset.py`` directly from cleaned real RuralIoT
+measurements and does not call this script.
+"""
 import os
 import glob
 import pandas as pd

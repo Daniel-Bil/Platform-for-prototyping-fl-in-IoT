@@ -37,7 +37,7 @@ from json_model_parser import build_model_from_json
 # ==========================================
 # KONFIGURACJA EKSPERYMENTU LOKALNEGO
 # ==========================================
-FL_DATASET_DIR = os.path.join("data", "fl_dataset")
+FL_DATASET_DIR = os.environ.get("FL_DATASET_DIR", os.path.join("data", "fl_dataset_real"))
 JSON_MODEL_PATH = "fl_model.json"
 TOTAL_EPOCHS = 15  # Taki sam budżet epok dla sprawiedliwego porównania
 BATCH_SIZE = 32

@@ -287,3 +287,25 @@ The dynamic server still has no admission-time expected-client count.
 `requested_clients` is benchmark metadata only; the collector validates the
 actual `logical_client_count` after each round and rejects incomplete runs from
 the thesis aggregate.
+
+## Final thesis dataset (cleaned REAL RuralIoT)
+
+The deployment benchmark now uses `tools2/data/fl_dataset_real` by default.
+It is generated from the cleaned **real** RuralIoT measurements, not from the
+VAE synthetic timeline:
+
+```bash
+cd tools2
+python3 05_prepare_fl_dataset.py --force
+python3 06_validate_fl_dataset.py
+```
+
+The preparation script first selects an equal-length contiguous interval of
+complete 10-minute real measurements for every sensor, performs the chronological
+70/15/15 train/validation/test split, and only then injects controlled fault
+episodes separately into each split.  The default target is 25% anomalies in
+every split.  Fault type remains client-specific to preserve non-IID behavior.
+
+The legacy synthetic benchmark remains in `tools2/data/fl_dataset` and the VAE
+files remain untouched.  To intentionally run a deployment against another
+dataset root, override the Ansible `fl_dataset_root` variable.

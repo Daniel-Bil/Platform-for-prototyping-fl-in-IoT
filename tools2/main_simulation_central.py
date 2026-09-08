@@ -43,7 +43,7 @@ from json_model_parser import build_model_from_json
 # ==========================================
 # KONFIGURACJA EKSPERYMENTU CENTRALNEGO
 # ==========================================
-FL_DATASET_DIR = os.path.join("data", "fl_dataset")
+FL_DATASET_DIR = os.environ.get("FL_DATASET_DIR", os.path.join("data", "fl_dataset_real"))
 JSON_MODEL_PATH = "fl_model.json"  # <-- Ścieżka do Twojego pliku z GUI
 
 # Budżet epok = ROUNDS * LOCAL_EPOCHS z eksperymentu FL (np. 5 rund * 3 epoki = 15)

@@ -1,0 +1,25 @@
+{
+  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "source_kind": "cleaned_real_ruraliot",
+  "rows_per_client": 960,
+  "target_anomaly_rate": 0.25,
+  "clients": [
+    "client_df_RuralIoT_001",
+    "client_df_RuralIoT_002",
+    "client_df_RuralIoT_003",
+    "client_df_RuralIoT_010",
+    "client_df_RuralIoT_21",
+    "client_df_RuralIoT_22",
+    "client_df_RuralIoT_23"
+  ],
+  "profiles": {
+    "df_RuralIoT_001": "temperature_drift",
+    "df_RuralIoT_002": "temperature_bias",
+    "df_RuralIoT_003": "single_feature_dropout",
+    "df_RuralIoT_010": "multi_feature_dropout",
+    "df_RuralIoT_21": "burst_noise",
+    "df_RuralIoT_22": "humidity_flatline",
+    "df_RuralIoT_23": "mixed_flatline_dropout"
+  },
+  "notes": "Chronological split is performed before controlled fault injection. Each split contains both classes; synthetic VAE data is not used by this benchmark."
+}

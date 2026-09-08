@@ -265,7 +265,7 @@
   vars:
     fl_run_user: "{{ ansible_user_id }}"
     fl_client_id_effective: "{{ inventory_hostname }}"
-    fl_client_data_path: "{{ repo_dest }}/tools2/data/fl_dataset/{{ fl_dataset_name }}"
+    fl_client_data_path: "{{ fl_dataset_root }}/{{ fl_dataset_name }}"
   tasks:
     - name: Require a dataset assignment for selected client
       ansible.builtin.assert:

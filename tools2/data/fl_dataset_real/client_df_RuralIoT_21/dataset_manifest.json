@@ -1,0 +1,101 @@
+{
+  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "sensor_id": "df_RuralIoT_21",
+  "client_dir": "client_df_RuralIoT_21",
+  "source_kind": "cleaned_real_ruraliot",
+  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_21_CLEANED.csv",
+  "fault_profile": "burst_noise",
+  "target_anomaly_rate": 0.25,
+  "seed": 42,
+  "split_before_fault_injection": true,
+  "features": [
+    "value_temp",
+    "value_hum",
+    "value_acid",
+    "value_PV"
+  ],
+  "cadence_minutes": 10,
+  "source_valid_run_start": 0,
+  "source_valid_run_end_exclusive": 10324,
+  "source_valid_run_rows": 10324,
+  "selected_start_row": 4682,
+  "selected_rows": 960,
+  "selected_start_time": "2023-09-11T21:20:00+00:00",
+  "selected_end_time": "2023-09-18T13:10:00+00:00",
+  "splits": {
+    "train": {
+      "rows": 672,
+      "normal_rows": 504,
+      "anomaly_rows": 168,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          38,
+          73
+        ],
+        [
+          264,
+          278
+        ],
+        [
+          301,
+          323
+        ],
+        [
+          427,
+          462
+        ],
+        [
+          506,
+          540
+        ],
+        [
+          549,
+          567
+        ],
+        [
+          574,
+          584
+        ]
+      ],
+      "start_time": "2023-09-11T21:20:00+00:00",
+      "end_time": "2023-09-16T13:10:00+00:00"
+    },
+    "val": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          22,
+          42
+        ],
+        [
+          126,
+          142
+        ]
+      ],
+      "start_time": "2023-09-16T13:20:00+00:00",
+      "end_time": "2023-09-17T13:10:00+00:00"
+    },
+    "test": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          23,
+          42
+        ],
+        [
+          118,
+          135
+        ]
+      ],
+      "start_time": "2023-09-17T13:20:00+00:00",
+      "end_time": "2023-09-18T13:10:00+00:00"
+    }
+  }
+}

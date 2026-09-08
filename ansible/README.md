@@ -102,3 +102,22 @@ The cloud writes each run under:
 
 with `config.json`, `rounds.csv`, `participants.csv`, `summary.json` and
 `global_weights.npz`.
+
+## Dataset used by deployment experiments
+
+`group_vars/all.yml` points `fl_dataset_root` at:
+
+```text
+tools2/data/fl_dataset_real
+```
+
+This is the final thesis dataset built from cleaned real RuralIoT measurements.
+Before pushing a regenerated dataset, validate it locally:
+
+```bash
+cd tools2
+python3 05_prepare_fl_dataset.py --force
+python3 06_validate_fl_dataset.py
+```
+
+The old synthetic FL dataset is kept separately in `tools2/data/fl_dataset`.

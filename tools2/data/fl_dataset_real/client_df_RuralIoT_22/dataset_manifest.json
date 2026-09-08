@@ -1,0 +1,109 @@
+{
+  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "sensor_id": "df_RuralIoT_22",
+  "client_dir": "client_df_RuralIoT_22",
+  "source_kind": "cleaned_real_ruraliot",
+  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_22_CLEANED.csv",
+  "fault_profile": "humidity_flatline",
+  "target_anomaly_rate": 0.25,
+  "seed": 42,
+  "split_before_fault_injection": true,
+  "features": [
+    "value_temp",
+    "value_hum",
+    "value_acid",
+    "value_PV"
+  ],
+  "cadence_minutes": 10,
+  "source_valid_run_start": 0,
+  "source_valid_run_end_exclusive": 4393,
+  "source_valid_run_rows": 4393,
+  "selected_start_row": 1716,
+  "selected_rows": 960,
+  "selected_start_time": "2023-08-21T11:50:00+00:00",
+  "selected_end_time": "2023-08-28T03:40:00+00:00",
+  "splits": {
+    "train": {
+      "rows": 672,
+      "normal_rows": 504,
+      "anomaly_rows": 168,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          122,
+          124
+        ],
+        [
+          140,
+          152
+        ],
+        [
+          171,
+          187
+        ],
+        [
+          232,
+          254
+        ],
+        [
+          384,
+          403
+        ],
+        [
+          461,
+          483
+        ],
+        [
+          515,
+          536
+        ],
+        [
+          558,
+          576
+        ],
+        [
+          596,
+          632
+        ]
+      ],
+      "start_time": "2023-08-21T11:50:00+00:00",
+      "end_time": "2023-08-26T03:40:00+00:00"
+    },
+    "val": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          69,
+          95
+        ],
+        [
+          118,
+          128
+        ]
+      ],
+      "start_time": "2023-08-26T03:50:00+00:00",
+      "end_time": "2023-08-27T03:40:00+00:00"
+    },
+    "test": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          60,
+          84
+        ],
+        [
+          125,
+          137
+        ]
+      ],
+      "start_time": "2023-08-27T03:50:00+00:00",
+      "end_time": "2023-08-28T03:40:00+00:00"
+    }
+  }
+}

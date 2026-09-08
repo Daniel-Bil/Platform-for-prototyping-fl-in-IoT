@@ -1,0 +1,113 @@
+{
+  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "sensor_id": "df_RuralIoT_23",
+  "client_dir": "client_df_RuralIoT_23",
+  "source_kind": "cleaned_real_ruraliot",
+  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_23_CLEANED.csv",
+  "fault_profile": "mixed_flatline_dropout",
+  "target_anomaly_rate": 0.25,
+  "seed": 42,
+  "split_before_fault_injection": true,
+  "features": [
+    "value_temp",
+    "value_hum",
+    "value_acid",
+    "value_PV"
+  ],
+  "cadence_minutes": 10,
+  "source_valid_run_start": 7137,
+  "source_valid_run_end_exclusive": 9112,
+  "source_valid_run_rows": 1975,
+  "selected_start_row": 7644,
+  "selected_rows": 960,
+  "selected_start_time": "2023-10-02T17:50:00+00:00",
+  "selected_end_time": "2023-10-09T09:40:00+00:00",
+  "splits": {
+    "train": {
+      "rows": 672,
+      "normal_rows": 504,
+      "anomaly_rows": 168,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          0,
+          20
+        ],
+        [
+          114,
+          125
+        ],
+        [
+          194,
+          212
+        ],
+        [
+          239,
+          255
+        ],
+        [
+          276,
+          297
+        ],
+        [
+          361,
+          393
+        ],
+        [
+          433,
+          447
+        ],
+        [
+          470,
+          483
+        ],
+        [
+          505,
+          528
+        ]
+      ],
+      "start_time": "2023-10-02T17:50:00+00:00",
+      "end_time": "2023-10-07T09:40:00+00:00"
+    },
+    "val": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          22,
+          28
+        ],
+        [
+          80,
+          100
+        ],
+        [
+          115,
+          125
+        ]
+      ],
+      "start_time": "2023-10-07T09:50:00+00:00",
+      "end_time": "2023-10-08T09:40:00+00:00"
+    },
+    "test": {
+      "rows": 144,
+      "normal_rows": 108,
+      "anomaly_rows": 36,
+      "anomaly_rate": 0.25,
+      "episodes": [
+        [
+          7,
+          27
+        ],
+        [
+          61,
+          77
+        ]
+      ],
+      "start_time": "2023-10-08T09:50:00+00:00",
+      "end_time": "2023-10-09T09:40:00+00:00"
+    }
+  }
+}

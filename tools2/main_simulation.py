@@ -50,7 +50,7 @@ from json_model_parser import build_model_from_json
 # ==========================================
 # KONFIGURACJA SYMULACJI BADAWCZEJ
 # ==========================================
-FL_DATASET_DIR = os.path.join("data", "fl_dataset")
+FL_DATASET_DIR = os.environ.get("FL_DATASET_DIR", os.path.join("data", "fl_dataset_real"))
 JSON_MODEL_PATH = "fl_model.json"  # <-- Ścieżka do Twojego pliku z GUI
 ROUNDS = 5            # Liczba rund komunikacyjnych
 LOCAL_EPOCHS = 3      # Epoki lokalne u klienta
