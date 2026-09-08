@@ -155,7 +155,7 @@
           User={{ fl_run_user }}
           WorkingDirectory={{ deployment_dir }}
           Environment=PYTHONUNBUFFERED=1
-          ExecStart={{ venv_dir }}/bin/python {{ deployment_dir }}/server/server.py --host 0.0.0.0 --port {{ fl_port }} --model {{ fl_model_path }} --algorithm {{ fl_algorithm }} --rounds {{ fl_rounds }} --local-epochs {{ fl_local_epochs }} --batch-size {{ fl_batch_size }} --join-window {{ fl_join_window }} --round-timeout {{ fl_round_timeout }} --evaluation-timeout {{ fl_evaluation_timeout }} --evaluate-every {{ fl_evaluate_every }} --eval-batch-size {{ fl_eval_batch_size }} --seed {{ fl_seed }} --fedprox-mu {{ fl_fedprox_mu }} --fedpaq-bits {{ fl_fedpaq_bits }}
+          ExecStart={{ venv_dir }}/bin/python {{ deployment_dir }}/server/server.py --host 0.0.0.0 --port {{ fl_port }} --model {{ fl_model_path }} --algorithm {{ fl_algorithm }} --rounds {{ fl_rounds }} --local-epochs {{ fl_local_epochs }} --batch-size {{ fl_batch_size }} --join-window {{ fl_join_window }}{% if fl_initial_join_window | string | length > 0 %} --initial-join-window {{ fl_initial_join_window }}{% endif %} --round-timeout {{ fl_round_timeout }} --evaluation-timeout {{ fl_evaluation_timeout }} --evaluate-every {{ fl_evaluate_every }} --eval-batch-size {{ fl_eval_batch_size }} --seed {{ fl_seed }} --fedprox-mu {{ fl_fedprox_mu }} --fedpaq-bits {{ fl_fedpaq_bits }}{% if fl_run_id | string | length > 0 %} --run-id {{ fl_run_id }}{% endif %}{% if fl_campaign_id | string | length > 0 %} --campaign-id {{ fl_campaign_id }}{% endif %}{% if fl_repetition | int > 0 %} --repetition {{ fl_repetition }}{% endif %} --requested-clients {{ fl_requested_clients if (fl_requested_clients | int > 0) else fl_client_count }}
           Restart=no
 
           [Install]

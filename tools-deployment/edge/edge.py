@@ -100,7 +100,18 @@ class HierFedAvgEdge:
                 raise ProtocolError("client must report positive train_samples")
 
             child_sock.settimeout(None)
-            session = ClientSession(client_id, child_sock, address, train_samples, role="client")
+            profile = {
+                "dataset_name": ready.metadata.get("dataset_name"),
+                "train_samples": train_samples,
+                "val_samples": int(ready.metadata.get("val_samples", 0) or 0),
+                "test_samples": int(ready.metadata.get("test_samples", 0) or 0),
+                "train_positive": int(ready.metadata.get("train_positive", 0) or 0),
+                "val_positive": int(ready.metadata.get("val_positive", 0) or 0),
+                "test_positive": int(ready.metadata.get("test_positive", 0) or 0),
+            }
+            session = ClientSession(
+                client_id, child_sock, address, train_samples, role="client", profile=profile
+            )
             session.bytes_received += hello.wire_bytes + ready.wire_bytes
             session.bytes_sent += welcome_bytes
             self.registry.register(session)
@@ -203,7 +214,13 @@ class HierFedAvgEdge:
                         successful_ids.append(client_id)
                         records.append({
                             "client_id": client_id,
+                            "dataset_name": session.profile.get("dataset_name"),
                             "train_samples": session.train_samples,
+                            "val_samples": int(session.profile.get("val_samples", 0) or 0),
+                            "test_samples_profile": int(session.profile.get("test_samples", 0) or 0),
+                            "train_positive": int(session.profile.get("train_positive", 0) or 0),
+                            "val_positive": int(session.profile.get("val_positive", 0) or 0),
+                            "test_positive": int(session.profile.get("test_positive", 0) or 0),
                             "train_seconds": float(meta.get("train_seconds", 0.0)),
                             "final_loss": meta.get("final_loss"),
                             "final_accuracy": meta.get("final_accuracy"),
@@ -319,6 +336,7 @@ class HierFedAvgEdge:
                 "edge_aggregation_seconds": round(aggregation_seconds, 6),
                 "edge_child_train_bytes_down": max(0, after_sent - before_sent),
                 "edge_child_train_bytes_up": max(0, after_recv - before_recv),
+                "child_update_records": records,
             },
             edge_weights,
         )
@@ -355,6 +373,7 @@ class HierFedAvgEdge:
                             raise ProtocolError("invalid child evaluation counts")
                         records.append({
                             "client_id": client_id,
+                            "dataset_name": session.profile.get("dataset_name"),
                             "test_samples": n,
                             "test_loss": float(meta["test_loss"]),
                             "tp": tp, "tn": tn, "fp": fp, "fn": fn,
@@ -435,6 +454,7 @@ class HierFedAvgEdge:
                 "child_count": len(records),
                 "edge_child_eval_bytes_down": max(0, after_sent - before_sent),
                 "edge_child_eval_bytes_up": max(0, after_recv - before_recv),
+                "child_eval_records": records,
             },
         )
         LOG.info(

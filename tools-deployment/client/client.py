@@ -90,7 +90,13 @@ def run(args: argparse.Namespace) -> int:
             {
                 "type": "READY",
                 "client_id": args.client_id,
+                "dataset_name": Path(args.data).name,
                 "train_samples": data.train_samples,
+                "val_samples": int(len(data.y_val)),
+                "test_samples": int(len(data.y_test)),
+                "train_positive": int(data.y_train.sum()),
+                "val_positive": int(data.y_val.sum()),
+                "test_positive": int(data.y_test.sum()),
             },
         )
         LOG.info("Registered as %s; waiting for rounds", args.client_id)

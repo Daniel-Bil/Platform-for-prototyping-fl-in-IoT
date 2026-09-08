@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import json
 import logging
 import os
+import platform
 from pathlib import Path
 import queue
 import random
@@ -46,8 +47,9 @@ LOG = logging.getLogger("fl-server")
 SUPPORTED_ALGORITHMS = ("FedAvg", "FedProx", "FedPAQ", "FedMA", "HierFedAvg")
 
 ROUND_FIELDS = [
-    "round", "algorithm", "cohort_size", "successful_updates", "evaluation_results",
-    "client_ids", "successful_client_ids", "train_samples", "test_samples",
+    "round", "algorithm", "requested_clients", "cohort_size", "successful_updates", "evaluation_results",
+    "client_ids", "successful_client_ids", "logical_client_count", "logical_client_ids",
+    "train_samples", "test_samples",
     "round_seconds", "training_phase_seconds", "aggregation_seconds", "evaluation_phase_seconds",
     "test_loss", "accuracy", "precision", "recall", "specificity", "f1", "normal_f1", "macro_f1",
     "tp", "tn", "fp", "fn",
@@ -59,10 +61,14 @@ ROUND_FIELDS = [
 ]
 
 PARTICIPANT_FIELDS = [
-    "round", "algorithm", "participant_id", "role", "train_samples", "train_seconds",
-    "final_loss", "final_accuracy", "final_objective", "final_proximal_term", "update_wire_bytes",
-    "test_samples", "test_loss", "test_accuracy", "tp", "tn", "fp", "fn",
+    "round", "algorithm", "participant_id", "role", "parent_id", "dataset_name",
+    "train_samples", "val_samples", "profile_test_samples",
+    "train_positive", "val_positive", "test_positive",
+    "train_positive_rate", "val_positive_rate", "test_positive_rate",
+    "train_seconds", "final_loss", "final_accuracy", "final_objective", "final_proximal_term",
+    "update_wire_bytes", "test_samples", "test_loss", "test_accuracy", "tp", "tn", "fp", "fn",
     "eval_seconds", "evaluation_wire_bytes", "child_count", "child_train_samples",
+    "edge_aggregation_seconds", "child_ids",
     "edge_child_train_bytes_down", "edge_child_train_bytes_up",
     "edge_child_eval_bytes_down", "edge_child_eval_bytes_up",
 ]
@@ -79,7 +85,9 @@ class FederatedServer:
         self.model = build_model_from_config(self.model_config, args.seq_len, len(args.features))
         self.global_weights = [np.asarray(w) for w in self.model.get_weights()]
         self.listener: socket.socket | None = None
-        self.run_dir = self._create_run_dir(Path(args.results_dir), self.algorithm)
+        self.started_utc = datetime.now(timezone.utc)
+        self.started_monotonic = time.perf_counter()
+        self.run_dir = self._create_run_dir(Path(args.results_dir), self.algorithm, args.run_id)
         self.rounds_csv = self.run_dir / "rounds.csv"
         self.participants_csv = self.run_dir / "participants.csv"
         self.round_rows: list[dict[str, Any]] = []
@@ -98,7 +106,18 @@ class FederatedServer:
             pass
 
     @staticmethod
-    def _create_run_dir(base: Path, algorithm: str) -> Path:
+    def _create_run_dir(base: Path, algorithm: str, run_id: str | None = None) -> Path:
+        base.mkdir(parents=True, exist_ok=True)
+        if run_id:
+            safe_run_id = "".join(ch for ch in str(run_id) if ch.isalnum() or ch in "-_.")
+            if not safe_run_id or safe_run_id != str(run_id):
+                raise ValueError("--run-id may contain only letters, digits, '-', '_' and '.'")
+            run_dir = base / safe_run_id
+            if run_dir.exists():
+                raise FileExistsError(f"result run directory already exists: {run_dir}")
+            run_dir.mkdir(parents=True, exist_ok=False)
+            return run_dir
+
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         safe_algorithm = "".join(ch for ch in algorithm if ch.isalnum() or ch in "-_")
         run_dir = base / f"{stamp}_{safe_algorithm}"
@@ -130,8 +149,20 @@ class FederatedServer:
         return params
 
     def _write_run_config(self) -> None:
+        try:
+            import tensorflow as tf
+            tensorflow_version = tf.__version__
+        except Exception:
+            tensorflow_version = None
+
+        model_params = int(self.model.count_params()) if hasattr(self.model, "count_params") else None
+        model_weight_bytes = int(sum(np.asarray(w).nbytes for w in self.global_weights))
         payload = {
-            "created_utc": datetime.now(timezone.utc).isoformat(),
+            "created_utc": self.started_utc.isoformat(),
+            "run_id": self.run_dir.name,
+            "campaign_id": self.args.campaign_id,
+            "repetition": self.args.repetition,
+            "requested_clients": self.args.requested_clients,
             "git_commit": self._git_revision(),
             "algorithm": self.algorithm,
             "algorithm_params": self._algorithm_params(),
@@ -148,8 +179,19 @@ class FederatedServer:
             "evaluate_every": self.args.evaluate_every,
             "eval_batch_size": self.args.eval_batch_size,
             "join_window": self.args.join_window,
+            "initial_join_window": self.args.initial_join_window,
             "model_path": str(Path(self.args.model).resolve()),
             "hierarchy": "cloud->edge->client" if self.algorithm == "HierFedAvg" else "cloud->client",
+            "runtime": {
+                "python": platform.python_version(),
+                "platform": platform.platform(),
+                "numpy": np.__version__,
+                "tensorflow": tensorflow_version,
+            },
+            "model": {
+                "parameter_count": model_params,
+                "weight_bytes_float": model_weight_bytes,
+            },
         }
         (self.run_dir / "config.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -211,7 +253,18 @@ class FederatedServer:
                 raise ProtocolError("participant must report positive train_samples")
 
             client_sock.settimeout(None)
-            session = ClientSession(client_id, client_sock, address, train_samples, role=role)
+            profile = {
+                "dataset_name": ready.metadata.get("dataset_name"),
+                "train_samples": train_samples,
+                "val_samples": int(ready.metadata.get("val_samples", 0) or 0),
+                "test_samples": int(ready.metadata.get("test_samples", 0) or 0),
+                "train_positive": int(ready.metadata.get("train_positive", 0) or 0),
+                "val_positive": int(ready.metadata.get("val_positive", 0) or 0),
+                "test_positive": int(ready.metadata.get("test_positive", 0) or 0),
+            }
+            session = ClientSession(
+                client_id, client_sock, address, train_samples, role=role, profile=profile
+            )
             session.bytes_received += hello.wire_bytes + ready.wire_bytes
             session.bytes_sent += welcome_bytes
             self.registry.register(session)
@@ -351,7 +404,14 @@ class FederatedServer:
                         records.append({
                             "participant_id": participant_id,
                             "role": session.role,
+                            "parent_id": None,
+                            "dataset_name": session.profile.get("dataset_name"),
                             "train_samples": aggregation_samples,
+                            "val_samples": int(session.profile.get("val_samples", 0) or 0),
+                            "profile_test_samples": int(session.profile.get("test_samples", 0) or 0),
+                            "train_positive": int(session.profile.get("train_positive", 0) or 0),
+                            "val_positive": int(session.profile.get("val_positive", 0) or 0),
+                            "test_positive": int(session.profile.get("test_positive", 0) or 0),
                             "train_seconds": float(meta.get("train_seconds", 0.0)),
                             "final_loss": meta.get("final_loss"),
                             "final_accuracy": meta.get("final_accuracy"),
@@ -359,9 +419,12 @@ class FederatedServer:
                             "final_proximal_term": meta.get("final_proximal_term"),
                             "update_wire_bytes": int(message.wire_bytes),
                             "child_count": int(meta.get("child_count", 0) or 0),
+                            "child_ids": list(meta.get("child_ids", []) or []),
                             "child_train_samples": int(meta.get("child_train_samples", 0) or 0),
+                            "edge_aggregation_seconds": float(meta.get("edge_aggregation_seconds", 0.0) or 0.0),
                             "edge_child_train_bytes_down": int(meta.get("edge_child_train_bytes_down", 0) or 0),
                             "edge_child_train_bytes_up": int(meta.get("edge_child_train_bytes_up", 0) or 0),
+                            "child_update_records": list(meta.get("child_update_records", []) or []),
                         })
                         extra = ""
                         if self.algorithm == "HierFedAvg":
@@ -467,6 +530,7 @@ class FederatedServer:
                             "evaluation_wire_bytes": int(message.wire_bytes),
                             "edge_child_eval_bytes_down": int(meta.get("edge_child_eval_bytes_down", 0) or 0),
                             "edge_child_eval_bytes_up": int(meta.get("edge_child_eval_bytes_up", 0) or 0),
+                            "child_eval_records": list(meta.get("child_eval_records", []) or []),
                         }
                     except (KeyError, TypeError, ValueError, ProtocolError) as exc:
                         LOG.warning("Round %d: rejected evaluation from %s: %s", round_id, participant_id, exc)
@@ -498,6 +562,15 @@ class FederatedServer:
                 writer.writeheader()
             writer.writerow({field: row.get(field) for field in fields})
 
+    @staticmethod
+    def _positive_rate(positive: Any, samples: Any) -> float | None:
+        try:
+            positive_i = int(positive or 0)
+            samples_i = int(samples or 0)
+        except (TypeError, ValueError):
+            return None
+        return float(positive_i / samples_i) if samples_i > 0 else None
+
     def _save_participant_rows(
         self,
         round_id: int,
@@ -506,13 +579,78 @@ class FederatedServer:
     ) -> None:
         eval_by_id = {record["participant_id"]: record for record in eval_records}
         for update in update_records:
+            eval_record = eval_by_id.get(update["participant_id"], {})
             row = {
                 "round": round_id,
                 "algorithm": self.algorithm,
                 **update,
-                **eval_by_id.get(update["participant_id"], {}),
+                **eval_record,
             }
+            row["child_ids"] = ";".join(str(x) for x in (update.get("child_ids") or []))
+            row["train_positive_rate"] = self._positive_rate(row.get("train_positive"), row.get("train_samples"))
+            row["val_positive_rate"] = self._positive_rate(row.get("val_positive"), row.get("val_samples"))
+            row["test_positive_rate"] = self._positive_rate(row.get("test_positive"), row.get("profile_test_samples"))
             self._append_csv(self.participants_csv, PARTICIPANT_FIELDS, row)
+
+            # For HierFedAvg, preserve edge-level rows *and* materialize the
+            # actual child measurements so analysis can compare local training
+            # time and non-IID class balance at the same logical-client level as
+            # direct algorithms.  No raw samples are included.
+            if self.algorithm != "HierFedAvg":
+                continue
+
+            child_eval_by_id = {
+                str(item.get("client_id")): item
+                for item in (eval_record.get("child_eval_records") or [])
+                if item.get("client_id") is not None
+            }
+            for child_update in update.get("child_update_records") or []:
+                child_id = str(child_update.get("client_id", ""))
+                if not child_id:
+                    continue
+                child_eval = child_eval_by_id.get(child_id, {})
+                child_row = {
+                    "round": round_id,
+                    "algorithm": self.algorithm,
+                    "participant_id": child_id,
+                    "role": "client",
+                    "parent_id": update["participant_id"],
+                    "dataset_name": child_update.get("dataset_name"),
+                    "train_samples": child_update.get("train_samples"),
+                    "val_samples": child_update.get("val_samples"),
+                    "profile_test_samples": child_update.get("test_samples_profile"),
+                    "train_positive": child_update.get("train_positive"),
+                    "val_positive": child_update.get("val_positive"),
+                    "test_positive": child_update.get("test_positive"),
+                    "train_seconds": child_update.get("train_seconds"),
+                    "final_loss": child_update.get("final_loss"),
+                    "final_accuracy": child_update.get("final_accuracy"),
+                    "update_wire_bytes": child_update.get("wire_bytes"),
+                    "test_samples": child_eval.get("test_samples"),
+                    "test_loss": child_eval.get("test_loss"),
+                    "test_accuracy": (
+                        None
+                        if not child_eval.get("test_samples")
+                        else (int(child_eval.get("tp", 0)) + int(child_eval.get("tn", 0)))
+                             / int(child_eval["test_samples"])
+                    ),
+                    "tp": child_eval.get("tp"),
+                    "tn": child_eval.get("tn"),
+                    "fp": child_eval.get("fp"),
+                    "fn": child_eval.get("fn"),
+                    "eval_seconds": child_eval.get("eval_seconds"),
+                    "evaluation_wire_bytes": child_eval.get("wire_bytes"),
+                }
+                child_row["train_positive_rate"] = self._positive_rate(
+                    child_row.get("train_positive"), child_row.get("train_samples")
+                )
+                child_row["val_positive_rate"] = self._positive_rate(
+                    child_row.get("val_positive"), child_row.get("val_samples")
+                )
+                child_row["test_positive_rate"] = self._positive_rate(
+                    child_row.get("test_positive"), child_row.get("profile_test_samples")
+                )
+                self._append_csv(self.participants_csv, PARTICIPANT_FIELDS, child_row)
 
     def _save_weights(self) -> None:
         np.savez_compressed(
@@ -524,10 +662,17 @@ class FederatedServer:
         common = {
             "status": "failed" if self.failure_reason else "completed",
             "failure_reason": self.failure_reason,
+            "run_id": self.run_dir.name,
+            "campaign_id": self.args.campaign_id,
+            "repetition": self.args.repetition,
+            "requested_clients": int(self.args.requested_clients or 0),
             "algorithm": self.algorithm,
             "algorithm_params": self._algorithm_params(),
             "seed": int(self.args.seed),
             "completed_rounds": len(self.round_rows),
+            "started_utc": self.started_utc.isoformat(),
+            "updated_utc": datetime.now(timezone.utc).isoformat(),
+            "server_wall_seconds": float(time.perf_counter() - self.started_monotonic),
             "run_dir": str(self.run_dir),
         }
         if not self.round_rows:
@@ -548,9 +693,21 @@ class FederatedServer:
                 "total_training_network_bytes": int(sum(int(r["bytes_total_train"]) for r in self.round_rows)),
                 "total_evaluation_network_bytes": int(sum(int(r["bytes_total_eval"]) for r in self.round_rows)),
                 "total_round_seconds": float(sum(float(r["round_seconds"]) for r in self.round_rows)),
+                "mean_round_seconds": float(
+                    sum(float(r["round_seconds"]) for r in self.round_rows) / len(self.round_rows)
+                ),
+                "mean_training_phase_seconds": float(
+                    sum(float(r["training_phase_seconds"]) for r in self.round_rows) / len(self.round_rows)
+                ),
+                "mean_evaluation_phase_seconds": float(
+                    sum(float(r["evaluation_phase_seconds"]) for r in self.round_rows) / len(self.round_rows)
+                ),
                 "mean_aggregation_seconds": float(
                     sum(float(r["aggregation_seconds"]) for r in self.round_rows) / len(self.round_rows)
                 ),
+                "final_logical_client_count": int(final.get("logical_client_count", 0) or 0),
+                "min_logical_client_count": int(min(int(r.get("logical_client_count", 0) or 0) for r in self.round_rows)),
+                "max_logical_client_count": int(max(int(r.get("logical_client_count", 0) or 0) for r in self.round_rows)),
             }
         (self.run_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
@@ -562,9 +719,14 @@ class FederatedServer:
             if not self.registry.wait_for_any(self.shutdown):
                 break
 
-            if self.args.join_window > 0:
-                LOG.info("Round %d join window: %.1fs", round_id, self.args.join_window)
-                self.shutdown.wait(self.args.join_window)
+            join_window = (
+                self.args.initial_join_window
+                if round_id == 1 and self.args.initial_join_window is not None
+                else self.args.join_window
+            )
+            if join_window > 0:
+                LOG.info("Round %d join window: %.1fs", round_id, join_window)
+                self.shutdown.wait(join_window)
                 if self.shutdown.is_set():
                     break
 
@@ -647,14 +809,27 @@ class FederatedServer:
             total_train = cloud_train_down + cloud_train_up + edge_train_down + edge_train_up
             total_eval = cloud_eval_down + cloud_eval_up + edge_eval_down + edge_eval_up
 
+            if self.algorithm == "HierFedAvg":
+                logical_client_ids = []
+                for record in update_records:
+                    logical_client_ids.extend(str(value) for value in (record.get("child_ids") or []))
+            else:
+                logical_client_ids = list(successful_ids)
+            # Preserve order while de-duplicating, useful if a malformed edge ever
+            # reports a child twice.
+            logical_client_ids = list(dict.fromkeys(logical_client_ids))
+
             row = {
                 "round": round_id,
                 "algorithm": self.algorithm,
+                "requested_clients": int(self.args.requested_clients or 0),
                 "cohort_size": len(cohort),
                 "successful_updates": len(updates),
                 "evaluation_results": len(eval_records),
                 "client_ids": ";".join(cohort_ids),
                 "successful_client_ids": ";".join(successful_ids),
+                "logical_client_count": len(logical_client_ids),
+                "logical_client_ids": ";".join(logical_client_ids),
                 "train_samples": sum(sample_counts),
                 **metrics,
                 "round_seconds": round(time.perf_counter() - round_started, 6),
@@ -729,9 +904,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seq-len", type=int, default=6)
     parser.add_argument("--features", nargs="+", default=list(DEFAULT_FEATURES))
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--run-id", default=None, help="Optional exact result-directory name for benchmark orchestration")
+    parser.add_argument("--campaign-id", default=None, help="Optional benchmark campaign identifier stored as metadata")
+    parser.add_argument("--repetition", type=int, default=None, help="Optional benchmark repetition number stored as metadata")
+    parser.add_argument("--requested-clients", type=int, default=0, help="Benchmark metadata only; never controls client admission")
     parser.add_argument("--fedprox-mu", type=float, default=0.01)
     parser.add_argument("--fedpaq-bits", type=int, default=8)
     parser.add_argument("--join-window", type=float, default=2.0)
+    parser.add_argument("--initial-join-window", type=float, default=None, help="Optional longer first-round registration grace period")
     parser.add_argument("--round-timeout", type=float, default=300.0)
     parser.add_argument("--evaluation-timeout", type=float, default=300.0)
     parser.add_argument("--evaluate-every", type=int, default=1, help="0 disables distributed evaluation")
@@ -750,6 +930,12 @@ def parse_args() -> argparse.Namespace:
         parser.error("--evaluate-every must be >= 0")
     if args.eval_batch_size <= 0:
         parser.error("--eval-batch-size must be > 0")
+    if args.requested_clients < 0:
+        parser.error("--requested-clients must be >= 0")
+    if args.repetition is not None and args.repetition < 1:
+        parser.error("--repetition must be >= 1")
+    if args.initial_join_window is not None and args.initial_join_window < 0:
+        parser.error("--initial-join-window must be >= 0")
     return args
 
 

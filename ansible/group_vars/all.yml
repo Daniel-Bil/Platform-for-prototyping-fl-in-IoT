@@ -31,6 +31,7 @@ fl_rounds: 3
 fl_local_epochs: 1
 fl_batch_size: 32
 fl_join_window: 2
+fl_initial_join_window: ""
 fl_round_timeout: 300
 fl_evaluation_timeout: 300
 fl_evaluate_every: 1
@@ -41,3 +42,10 @@ fl_model_path: "{{ deployment_dir }}/config/default_model.json"
 # Empty = use main's default IPv4 address discovered by Ansible.
 # Override when necessary with: -e fl_server_host=192.168.x.x
 fl_server_host: ""
+
+# Optional benchmark metadata. The Python server stores these in result artifacts;
+# they do NOT control how many clients the dynamic server accepts.
+fl_run_id: ""
+fl_campaign_id: ""
+fl_repetition: 0
+fl_requested_clients: 0

@@ -224,3 +224,66 @@ Use `--repetitions 3` (or more) for repeated measurements. All algorithms in a
 single repetition receive the same seed; the seed increments between
 repetitions. Important options include `--fedprox-mu`, `--fedpaq-bits`,
 `--edge-count`, `--batch-size` and `--algorithms`.
+
+## Thesis-grade benchmark campaign
+
+Use `run_all_experiments.py` for final result collection rather than launching
+individual smoke tests by hand. The campaign runner executes a matrix of:
+
+```text
+algorithm × client count × repetition
+```
+
+Each repetition uses one seed shared by every algorithm, and the seed increments
+between repetitions. The runner waits for the systemd server to finish, downloads
+the exact run directory by a unique run ID, and verifies that every requested
+logical client participated in every round. A failed configuration is recorded
+and the campaign continues unless `--fail-fast` is supplied.
+
+Recommended first research campaign:
+
+```bash
+python tools-deployment/scripts/run_all_experiments.py \
+  --client-counts 2,4,7 \
+  --rounds 5 \
+  --local-epochs 3 \
+  --repetitions 3
+```
+
+For final tables, increase to five repetitions if time permits:
+
+```bash
+python tools-deployment/scripts/run_all_experiments.py \
+  --client-counts 2,4,7 \
+  --rounds 5 \
+  --local-epochs 3 \
+  --repetitions 5
+```
+
+The default 5 rounds / 3 local epochs / batch size 32 deliberately matches the
+current `tools2/main_simulation.py` reference configuration.
+
+A campaign is stored under `benchmark-results/campaign-<UTC timestamp>/` and
+contains `campaign_status.csv` plus all raw server artifacts. The `analysis/`
+directory is rebuilt after every completed experiment and contains:
+
+- `runs.csv` — one row per complete experiment,
+- `rounds.csv` — every global round across the campaign,
+- `participants.csv` — client/edge measurements including local anomaly rates,
+- `summary_by_algorithm_clients.csv` — mean, standard deviation and 95% CI,
+- `round_summary.csv` — convergence statistics by FL round,
+- `participant_summary.csv` — per-device timing/distribution statistics,
+- PNG plots for F1, communication, aggregation time and convergence when
+  Matplotlib is available.
+
+Resume an interrupted campaign without repeating completed combinations:
+
+```bash
+python tools-deployment/scripts/run_all_experiments.py \
+  --resume benchmark-results/campaign-20260908T080000Z
+```
+
+The dynamic server still has no admission-time expected-client count.
+`requested_clients` is benchmark metadata only; the collector validates the
+actual `logical_client_count` after each round and rejects incomplete runs from
+the thesis aggregate.

@@ -20,6 +20,7 @@ class ClientSession:
     address: tuple[str, int]
     train_samples: int
     role: str = "client"
+    profile: dict[str, Any] = field(default_factory=dict)
     inbox: queue.Queue[Message] = field(default_factory=queue.Queue)
     send_lock: threading.Lock = field(default_factory=threading.Lock)
     alive: bool = True
