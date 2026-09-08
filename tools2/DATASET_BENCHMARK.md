@@ -53,3 +53,21 @@ The previous synthetic pipeline is preserved:
 
 It may still be used for platform demonstrations, but should not be the sole
 source of final thesis claims about real measurement data.
+
+## Sequence labels and directional-fault consistency
+
+For the final benchmark, a sequence window classifies its **last measurement**:
+
+```text
+X[t-seq_len+1 : t+1] -> y[t]
+```
+
+This is anomaly detection/cleaning of the current sensor sample, not prediction
+of whether the *next* sample will be anomalous.
+
+Directional profiles (temperature drift, temperature bias and humidity
+flatline) contain both positive and negative fault episodes in **train,
+validation and test separately**.  Mixed flatline/dropout clients likewise use
+both flatline directions in every split.  This prevents a client from learning,
+for example, only positive bias during training and receiving only negative bias
+at test time.

@@ -325,3 +325,11 @@ every split.  Fault type remains client-specific to preserve non-IID behavior.
 The legacy synthetic benchmark remains in `tools2/data/fl_dataset` and the VAE
 files remain untouched.  To intentionally run a deployment against another
 dataset root, override the Ansible `fl_dataset_root` variable.
+
+
+### Sequence-label semantics
+
+Sensor windows are causal anomaly-detection windows: the label belongs to the
+**last sample present inside the input window** (`X[t-seq_len+1:t+1] -> y[t]`).
+This intentionally avoids next-step anomaly prediction.
+

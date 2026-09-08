@@ -1,13 +1,15 @@
 {
-  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "dataset_version": "cleaned-real-controlled-faults-v2",
   "sensor_id": "df_RuralIoT_010",
   "client_dir": "client_df_RuralIoT_010",
   "source_kind": "cleaned_real_ruraliot",
-  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_010_CLEANED.csv",
+  "source_file": "/mnt/data/project_threshold_fixed/tools2/data/df_RuralIoT_010_CLEANED.csv",
   "fault_profile": "multi_feature_dropout",
   "target_anomaly_rate": 0.25,
   "seed": 42,
   "split_before_fault_injection": true,
+  "fault_direction_policy": "balanced_positive_negative_per_split",
+  "sequence_label_semantics": "classify_last_sample_in_input_window",
   "features": [
     "value_temp",
     "value_hum",
@@ -62,6 +64,80 @@
           620
         ]
       ],
+      "fault_variants": [
+        {
+          "start": 107,
+          "end": 136,
+          "kind": "dropout",
+          "features": [
+            "value_temp",
+            "value_acid"
+          ]
+        },
+        {
+          "start": 141,
+          "end": 151,
+          "kind": "dropout",
+          "features": [
+            "value_acid",
+            "value_hum"
+          ]
+        },
+        {
+          "start": 182,
+          "end": 204,
+          "kind": "dropout",
+          "features": [
+            "value_acid",
+            "value_PV"
+          ]
+        },
+        {
+          "start": 216,
+          "end": 233,
+          "kind": "dropout",
+          "features": [
+            "value_PV",
+            "value_hum"
+          ]
+        },
+        {
+          "start": 373,
+          "end": 395,
+          "kind": "dropout",
+          "features": [
+            "value_temp",
+            "value_acid"
+          ]
+        },
+        {
+          "start": 429,
+          "end": 453,
+          "kind": "dropout",
+          "features": [
+            "value_hum",
+            "value_PV"
+          ]
+        },
+        {
+          "start": 515,
+          "end": 533,
+          "kind": "dropout",
+          "features": [
+            "value_PV",
+            "value_temp"
+          ]
+        },
+        {
+          "start": 594,
+          "end": 620,
+          "kind": "dropout",
+          "features": [
+            "value_hum",
+            "value_temp"
+          ]
+        }
+      ],
       "start_time": "2023-07-15T19:00:00+00:00",
       "end_time": "2023-07-20T10:50:00+00:00"
     },
@@ -73,16 +149,71 @@
       "episodes": [
         [
           5,
-          6
+          14
         ],
         [
           19,
-          28
+          27
         ],
         [
-          77,
-          103
+          36,
+          38
+        ],
+        [
+          64,
+          72
+        ],
+        [
+          88,
+          97
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 5,
+          "end": 14,
+          "kind": "dropout",
+          "features": [
+            "value_hum",
+            "value_PV"
+          ]
+        },
+        {
+          "start": 19,
+          "end": 27,
+          "kind": "dropout",
+          "features": [
+            "value_PV",
+            "value_hum"
+          ]
+        },
+        {
+          "start": 36,
+          "end": 38,
+          "kind": "dropout",
+          "features": [
+            "value_hum",
+            "value_temp"
+          ]
+        },
+        {
+          "start": 64,
+          "end": 72,
+          "kind": "dropout",
+          "features": [
+            "value_hum",
+            "value_PV"
+          ]
+        },
+        {
+          "start": 88,
+          "end": 97,
+          "kind": "dropout",
+          "features": [
+            "value_hum",
+            "value_PV"
+          ]
+        }
       ],
       "start_time": "2023-07-20T11:00:00+00:00",
       "end_time": "2023-07-21T10:50:00+00:00"
@@ -94,13 +225,72 @@
       "anomaly_rate": 0.25,
       "episodes": [
         [
-          71,
-          103
+          0,
+          8
         ],
         [
-          111,
-          115
+          71,
+          80
+        ],
+        [
+          85,
+          94
+        ],
+        [
+          107,
+          116
+        ],
+        [
+          123,
+          124
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 0,
+          "end": 8,
+          "kind": "dropout",
+          "features": [
+            "value_hum",
+            "value_temp"
+          ]
+        },
+        {
+          "start": 71,
+          "end": 80,
+          "kind": "dropout",
+          "features": [
+            "value_acid",
+            "value_hum"
+          ]
+        },
+        {
+          "start": 85,
+          "end": 94,
+          "kind": "dropout",
+          "features": [
+            "value_acid",
+            "value_PV"
+          ]
+        },
+        {
+          "start": 107,
+          "end": 116,
+          "kind": "dropout",
+          "features": [
+            "value_acid",
+            "value_PV"
+          ]
+        },
+        {
+          "start": 123,
+          "end": 124,
+          "kind": "dropout",
+          "features": [
+            "value_temp",
+            "value_hum"
+          ]
+        }
       ],
       "start_time": "2023-07-21T11:00:00+00:00",
       "end_time": "2023-07-22T10:50:00+00:00"

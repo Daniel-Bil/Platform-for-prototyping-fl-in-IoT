@@ -20,8 +20,11 @@ platform feature, but the default thesis benchmark now uses real measurements:
 
 Every client receives approximately the same anomaly prevalence in every split,
 while the *fault type* and the underlying real sensor distribution remain
-client-specific (non-IID).  This lets aggregation methods be compared without
-class imbalance dominating the result.
+client-specific (non-IID). Directional faults (bias/drift/flatline) include both
+positive and negative variants inside EACH split, so train/validation/test do not
+accidentally teach contradictory one-sided fault semantics. This lets aggregation
+methods be compared without class imbalance or split-specific fault direction
+dominating the result.
 """
 from __future__ import annotations
 
@@ -149,6 +152,16 @@ def choose_fault_episodes(
     # 10-minute data, while validation/test still get multiple separate episodes.
     min_len = max(4, min(12, n_rows // 18))
     max_len = max(min_len, min(36, n_rows // 4))
+
+    # Keep several separate episodes in a split.  Besides being more realistic
+    # than one permanent failure, this guarantees enough episodes to expose
+    # both positive and negative variants of directional faults at the default
+    # 25% anomaly rate (including the 144-row validation/test splits).
+    if target >= 4 * min_len:
+        max_len = min(max_len, max(min_len, target // 4))
+    elif target >= 2 * min_len:
+        max_len = min(max_len, max(min_len, target // 2))
+
     occupied = np.zeros(n_rows, dtype=bool)
     episodes: list[tuple[int, int]] = []
     remaining = target
@@ -214,16 +227,42 @@ def _local_reference(series: pd.Series, start: int, end: int) -> float:
     return float(series.iloc[start:end].median())
 
 
-def _flatline_episode(df: pd.DataFrame, start: int, end: int, col: str) -> None:
+def _balanced_episode_signs(
+    episodes: list[tuple[int, int]],
+    rng: np.random.Generator,
+) -> list[float]:
+    """Return roughly balanced +/- signs, with both signs when possible.
+
+    The starting sign is seeded/randomized, but signs alternate afterwards.
+    Therefore every split containing >=2 directional episodes contains both
+    upward and downward faults rather than learning a split-specific direction.
+    """
+    if not episodes:
+        return []
+    first = -1.0 if rng.random() < 0.5 else 1.0
+    return [first if i % 2 == 0 else -first for i in range(len(episodes))]
+
+
+def _direction_name(sign: float) -> str:
+    return "positive" if sign > 0 else "negative"
+
+
+def _flatline_episode(
+    df: pd.DataFrame,
+    start: int,
+    end: int,
+    col: str,
+    sign: float,
+) -> float:
     base = _local_reference(df[col], start, end)
     lo, hi = PHYSICAL_LIMITS[col]
     span = hi - lo
-    # Deliberately wrong but physically possible stuck value.  Shift away from
-    # the local baseline so labels correspond to a real corruption.
+    # Deliberately wrong but physically possible stuck value.  Explicit sign
+    # makes upward and downward flatlines available in every split.
     shift = 0.15 * span
-    stuck = base - shift if base > (lo + hi) / 2 else base + shift
-    stuck = float(np.clip(stuck, lo, hi))
+    stuck = float(np.clip(base + sign * shift, lo, hi))
     df.iloc[start:end, df.columns.get_loc(col)] = stuck
+    return stuck
 
 
 def apply_profile(
@@ -231,36 +270,52 @@ def apply_profile(
     profile: str,
     episodes: list[tuple[int, int]],
     rng: np.random.Generator,
-) -> tuple[pd.DataFrame, np.ndarray]:
+) -> tuple[pd.DataFrame, np.ndarray, list[dict]]:
     corrupted = clean_split.copy()
     mask = mask_from_episodes(len(corrupted), episodes)
+    variants: list[dict] = []
 
     if profile == "temperature_drift":
-        for start, end in episodes:
+        signs = _balanced_episode_signs(episodes, rng)
+        for (start, end), sign in zip(episodes, signs):
             length = end - start
-            sign = -1.0 if rng.random() < 0.5 else 1.0
             severity = float(rng.uniform(2.0, 4.0))
             drift = sign * np.linspace(0.4, severity, length)
             corrupted.iloc[start:end, corrupted.columns.get_loc("value_temp")] += drift
+            variants.append({
+                "start": int(start), "end": int(end), "kind": "temperature_drift",
+                "direction": _direction_name(sign), "severity_end_c": severity,
+            })
 
     elif profile == "temperature_bias":
-        for start, end in episodes:
-            sign = -1.0 if rng.random() < 0.5 else 1.0
-            bias = sign * float(rng.uniform(2.0, 4.0))
+        signs = _balanced_episode_signs(episodes, rng)
+        for (start, end), sign in zip(episodes, signs):
+            magnitude = float(rng.uniform(2.0, 4.0))
+            bias = sign * magnitude
             corrupted.iloc[start:end, corrupted.columns.get_loc("value_temp")] += bias
+            variants.append({
+                "start": int(start), "end": int(end), "kind": "temperature_bias",
+                "direction": _direction_name(sign), "bias_c": float(bias),
+            })
 
     elif profile == "single_feature_dropout":
         feature_choices = np.array(FEATURES, dtype=object)
         for start, end in episodes:
             col = str(rng.choice(feature_choices))
             corrupted.iloc[start:end, corrupted.columns.get_loc(col)] = np.nan
+            variants.append({
+                "start": int(start), "end": int(end), "kind": "dropout", "features": [col],
+            })
 
     elif profile == "multi_feature_dropout":
         feature_choices = np.array(FEATURES, dtype=object)
         for start, end in episodes:
-            cols = rng.choice(feature_choices, size=2, replace=False)
+            cols = [str(x) for x in rng.choice(feature_choices, size=2, replace=False)]
             for col in cols:
-                corrupted.iloc[start:end, corrupted.columns.get_loc(str(col))] = np.nan
+                corrupted.iloc[start:end, corrupted.columns.get_loc(col)] = np.nan
+            variants.append({
+                "start": int(start), "end": int(end), "kind": "dropout", "features": cols,
+            })
 
     elif profile == "burst_noise":
         amplitudes = {
@@ -277,19 +332,38 @@ def apply_profile(
             # Ensure even low random draws represent a visible sensor disturbance.
             noise += np.sign(noise + 1e-9) * amplitudes[col] * 0.35
             corrupted.iloc[start:end, corrupted.columns.get_loc(col)] += noise
+            variants.append({
+                "start": int(start), "end": int(end), "kind": "burst_noise",
+                "feature": col, "std": amplitudes[col],
+            })
 
     elif profile == "humidity_flatline":
-        for start, end in episodes:
-            _flatline_episode(corrupted, start, end, "value_hum")
+        signs = _balanced_episode_signs(episodes, rng)
+        for (start, end), sign in zip(episodes, signs):
+            stuck = _flatline_episode(corrupted, start, end, "value_hum", sign)
+            variants.append({
+                "start": int(start), "end": int(end), "kind": "humidity_flatline",
+                "direction": _direction_name(sign), "stuck_value": stuck,
+            })
 
     elif profile == "mixed_flatline_dropout":
         feature_choices = np.array(FEATURES, dtype=object)
+        flatline_positions = [i for i in range(len(episodes)) if i % 2 == 0]
+        flatline_signs = iter(_balanced_episode_signs([episodes[i] for i in flatline_positions], rng))
         for i, (start, end) in enumerate(episodes):
             if i % 2 == 0:
-                _flatline_episode(corrupted, start, end, "value_hum")
+                sign = next(flatline_signs)
+                stuck = _flatline_episode(corrupted, start, end, "value_hum", sign)
+                variants.append({
+                    "start": int(start), "end": int(end), "kind": "humidity_flatline",
+                    "direction": _direction_name(sign), "stuck_value": stuck,
+                })
             else:
                 col = str(rng.choice(feature_choices))
                 corrupted.iloc[start:end, corrupted.columns.get_loc(col)] = np.nan
+                variants.append({
+                    "start": int(start), "end": int(end), "kind": "dropout", "features": [col],
+                })
 
     else:
         raise ValueError(f"unknown profile {profile!r}")
@@ -298,14 +372,14 @@ def apply_profile(
     for col, (lo, hi) in PHYSICAL_LIMITS.items():
         corrupted[col] = corrupted[col].clip(lower=lo, upper=hi)
 
-    # The NN cannot ingest NaNs.  For packet-loss profiles, local forward-fill
+    # The NN cannot ingest NaNs. For packet-loss profiles, local forward-fill
     # creates the expected stale-value pattern; bfill is only a boundary fallback.
     corrupted[list(FEATURES)] = corrupted[list(FEATURES)].ffill().bfill()
     if corrupted[list(FEATURES)].isna().any().any():
         raise AssertionError("imputation left NaNs in prepared client data")
 
     corrupted["label"] = mask.astype(np.int8)
-    return corrupted, mask
+    return corrupted, mask, variants
 
 
 def write_client(
@@ -333,7 +407,7 @@ def write_client(
     for split_name, clean_split in clean_splits.items():
         rng = np.random.default_rng(stable_seed(seed, sensor_id, split_name))
         episodes = choose_fault_episodes(len(clean_split), anomaly_rate, rng)
-        corrupted, mask = apply_profile(clean_split, profile, episodes, rng)
+        corrupted, mask, fault_variants = apply_profile(clean_split, profile, episodes, rng)
         corrupted.to_csv(client_dir / f"{split_name}.csv", index_label="time")
 
         positives = int(mask.sum())
@@ -343,12 +417,13 @@ def write_client(
             "anomaly_rows": positives,
             "anomaly_rate": float(positives / len(corrupted)),
             "episodes": [[int(a), int(b)] for a, b in episodes],
+            "fault_variants": fault_variants,
             "start_time": corrupted.index[0].isoformat(),
             "end_time": corrupted.index[-1].isoformat(),
         }
 
     manifest = {
-        "dataset_version": "cleaned-real-controlled-faults-v1",
+        "dataset_version": "cleaned-real-controlled-faults-v2",
         "sensor_id": sensor_id,
         "client_dir": client_dir.name,
         "source_kind": "cleaned_real_ruraliot",
@@ -357,6 +432,8 @@ def write_client(
         "target_anomaly_rate": float(anomaly_rate),
         "seed": int(seed),
         "split_before_fault_injection": True,
+        "fault_direction_policy": "balanced_positive_negative_per_split",
+        "sequence_label_semantics": "classify_last_sample_in_input_window",
         "features": list(FEATURES),
         "cadence_minutes": 10,
         **source_meta,
@@ -396,14 +473,17 @@ def write_summary(output_root: Path, manifests: list[dict]) -> None:
             })
 
     campaign_manifest = {
-        "dataset_version": "cleaned-real-controlled-faults-v1",
+        "dataset_version": "cleaned-real-controlled-faults-v2",
         "source_kind": "cleaned_real_ruraliot",
         "rows_per_client": manifests[0]["selected_rows"] if manifests else None,
         "target_anomaly_rate": manifests[0]["target_anomaly_rate"] if manifests else None,
         "clients": [m["client_dir"] for m in manifests],
         "profiles": {m["sensor_id"]: m["fault_profile"] for m in manifests},
+        "fault_direction_policy": "balanced_positive_negative_per_split",
+        "sequence_label_semantics": "classify_last_sample_in_input_window",
         "notes": (
             "Chronological split is performed before controlled fault injection. "
+            "Directional faults contain both positive and negative variants in each split. "
             "Each split contains both classes; synthetic VAE data is not used by this benchmark."
         ),
     }

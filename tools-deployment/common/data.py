@@ -26,13 +26,24 @@ class ClientData:
 
 
 def _create_sequences(X: np.ndarray, y: np.ndarray, seq_len: int) -> tuple[np.ndarray, np.ndarray]:
-    if len(X) <= seq_len:
+    """Build causal windows and classify the LAST sample inside each window.
+
+    For an anomaly-detection / cleaning task, a window ``X[t-seq_len+1:t+1]``
+    must be paired with ``y[t]``.  The previous implementation paired it with
+    ``y[t+1]``, which silently changed the task into next-step anomaly
+    prediction and was especially harmful around fault boundaries.
+    """
+    if seq_len <= 0:
+        raise ValueError("seq_len must be positive")
+    if len(X) < seq_len:
         return (
             np.empty((0, seq_len, X.shape[1]), dtype=np.float32),
             np.empty((0,), dtype=y.dtype),
         )
-    Xs = np.stack([X[i : i + seq_len] for i in range(len(X) - seq_len)])
-    ys = np.asarray([y[i + seq_len] for i in range(len(X) - seq_len)])
+
+    ends = range(seq_len - 1, len(X))
+    Xs = np.stack([X[end - seq_len + 1 : end + 1] for end in ends])
+    ys = np.asarray([y[end] for end in range(seq_len - 1, len(y))])
     return Xs.astype(np.float32, copy=False), ys
 
 

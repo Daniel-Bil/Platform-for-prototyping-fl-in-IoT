@@ -1,13 +1,15 @@
 {
-  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "dataset_version": "cleaned-real-controlled-faults-v2",
   "sensor_id": "df_RuralIoT_001",
   "client_dir": "client_df_RuralIoT_001",
   "source_kind": "cleaned_real_ruraliot",
-  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_001_CLEANED.csv",
+  "source_file": "/mnt/data/project_threshold_fixed/tools2/data/df_RuralIoT_001_CLEANED.csv",
   "fault_profile": "temperature_drift",
   "target_anomaly_rate": 0.25,
   "seed": 42,
   "split_before_fault_injection": true,
+  "fault_direction_policy": "balanced_positive_negative_per_split",
+  "sequence_label_semantics": "classify_last_sample_in_input_window",
   "features": [
     "value_temp",
     "value_hum",
@@ -58,6 +60,57 @@
           663
         ]
       ],
+      "fault_variants": [
+        {
+          "start": 46,
+          "end": 59,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 2.7675355689051386
+        },
+        {
+          "start": 209,
+          "end": 243,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 3.729224378052054
+        },
+        {
+          "start": 245,
+          "end": 280,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 3.773458950096601
+        },
+        {
+          "start": 391,
+          "end": 426,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 2.7295715294879086
+        },
+        {
+          "start": 430,
+          "end": 458,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 3.6238064876146927
+        },
+        {
+          "start": 518,
+          "end": 521,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 3.367439973613677
+        },
+        {
+          "start": 643,
+          "end": 663,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 2.69172897480248
+        }
+      ],
       "start_time": "2023-06-07T06:30:00+00:00",
       "end_time": "2023-06-11T22:20:00+00:00"
     },
@@ -68,13 +121,62 @@
       "anomaly_rate": 0.25,
       "episodes": [
         [
-          73,
-          86
+          22,
+          31
         ],
         [
-          100,
-          123
+          47,
+          48
+        ],
+        [
+          62,
+          70
+        ],
+        [
+          75,
+          84
+        ],
+        [
+          111,
+          120
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 22,
+          "end": 31,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 3.5048251630008687
+        },
+        {
+          "start": 47,
+          "end": 48,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 3.7189425998172103
+        },
+        {
+          "start": 62,
+          "end": 70,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 2.379553821679658
+        },
+        {
+          "start": 75,
+          "end": 84,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 3.12316373811872
+        },
+        {
+          "start": 111,
+          "end": 120,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 3.034741264651875
+        }
       ],
       "start_time": "2023-06-11T22:30:00+00:00",
       "end_time": "2023-06-12T22:20:00+00:00"
@@ -86,13 +188,62 @@
       "anomaly_rate": 0.25,
       "episodes": [
         [
-          29,
-          57
+          12,
+          20
+        ],
+        [
+          34,
+          43
+        ],
+        [
+          83,
+          86
+        ],
+        [
+          95,
+          103
         ],
         [
           126,
           134
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 12,
+          "end": 20,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 2.8360879707312043
+        },
+        {
+          "start": 34,
+          "end": 43,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 3.467174092128314
+        },
+        {
+          "start": 83,
+          "end": 86,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 3.078074906944618
+        },
+        {
+          "start": 95,
+          "end": 103,
+          "kind": "temperature_drift",
+          "direction": "positive",
+          "severity_end_c": 3.6357283064078456
+        },
+        {
+          "start": 126,
+          "end": 134,
+          "kind": "temperature_drift",
+          "direction": "negative",
+          "severity_end_c": 3.95183390009824
+        }
       ],
       "start_time": "2023-06-12T22:30:00+00:00",
       "end_time": "2023-06-13T22:20:00+00:00"

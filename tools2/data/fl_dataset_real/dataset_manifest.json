@@ -1,5 +1,5 @@
 {
-  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "dataset_version": "cleaned-real-controlled-faults-v2",
   "source_kind": "cleaned_real_ruraliot",
   "rows_per_client": 960,
   "target_anomaly_rate": 0.25,
@@ -21,5 +21,7 @@
     "df_RuralIoT_22": "humidity_flatline",
     "df_RuralIoT_23": "mixed_flatline_dropout"
   },
-  "notes": "Chronological split is performed before controlled fault injection. Each split contains both classes; synthetic VAE data is not used by this benchmark."
+  "fault_direction_policy": "balanced_positive_negative_per_split",
+  "sequence_label_semantics": "classify_last_sample_in_input_window",
+  "notes": "Chronological split is performed before controlled fault injection. Directional faults contain both positive and negative variants in each split. Each split contains both classes; synthetic VAE data is not used by this benchmark."
 }

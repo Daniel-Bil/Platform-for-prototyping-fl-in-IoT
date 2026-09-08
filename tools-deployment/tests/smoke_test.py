@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from common.data import _create_sequences
 from common.metrics import (
     aggregate_eval_records,
     make_threshold_grid,
@@ -86,6 +87,18 @@ def free_port() -> int:
     probe.close()
     return port
 
+
+
+def test_sequence_alignment() -> None:
+    # With seq_len=3, the first window [0,1,2] must be classified by y[2],
+    # not y[3]. This is current-sample anomaly detection, not next-step prediction.
+    X = np.arange(10, dtype=np.float32).reshape(5, 2)
+    y = np.array([0, 0, 1, 0, 1], dtype=np.int8)
+    Xs, ys = _create_sequences(X, y, seq_len=3)
+    assert Xs.shape == (3, 3, 2)
+    np.testing.assert_array_equal(Xs[0], X[:3])
+    np.testing.assert_array_equal(Xs[-1], X[2:5])
+    np.testing.assert_array_equal(ys, np.array([1, 0, 1], dtype=np.int8))
 
 def test_protocol_and_aggregation() -> None:
     left, right = socket.socketpair()
@@ -430,6 +443,7 @@ def test_dynamic_late_join() -> None:
 
 
 if __name__ == "__main__":
+    test_sequence_alignment()
     test_protocol_and_aggregation()
     test_metrics()
     test_fedpaq_quantization_and_wire_reduction()

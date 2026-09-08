@@ -1,13 +1,15 @@
 {
-  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "dataset_version": "cleaned-real-controlled-faults-v2",
   "sensor_id": "df_RuralIoT_22",
   "client_dir": "client_df_RuralIoT_22",
   "source_kind": "cleaned_real_ruraliot",
-  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_22_CLEANED.csv",
+  "source_file": "/mnt/data/project_threshold_fixed/tools2/data/df_RuralIoT_22_CLEANED.csv",
   "fault_profile": "humidity_flatline",
   "target_anomaly_rate": 0.25,
   "seed": 42,
   "split_before_fault_injection": true,
+  "fault_direction_policy": "balanced_positive_negative_per_split",
+  "sequence_label_semantics": "classify_last_sample_in_input_window",
   "features": [
     "value_temp",
     "value_hum",
@@ -66,6 +68,71 @@
           632
         ]
       ],
+      "fault_variants": [
+        {
+          "start": 122,
+          "end": 124,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 140,
+          "end": 152,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 171,
+          "end": 187,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 232,
+          "end": 254,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 384,
+          "end": 403,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 461,
+          "end": 483,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 515,
+          "end": 536,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 558,
+          "end": 576,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 596,
+          "end": 632,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        }
+      ],
       "start_time": "2023-08-21T11:50:00+00:00",
       "end_time": "2023-08-26T03:40:00+00:00"
     },
@@ -76,13 +143,62 @@
       "anomaly_rate": 0.25,
       "episodes": [
         [
-          69,
-          95
+          10,
+          12
         ],
         [
-          118,
+          78,
+          87
+        ],
+        [
+          109,
+          118
+        ],
+        [
+          120,
           128
+        ],
+        [
+          136,
+          144
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 10,
+          "end": 12,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 78,
+          "end": 87,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 109,
+          "end": 118,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 120,
+          "end": 128,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 136,
+          "end": 144,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        }
       ],
       "start_time": "2023-08-26T03:50:00+00:00",
       "end_time": "2023-08-27T03:40:00+00:00"
@@ -94,13 +210,62 @@
       "anomaly_rate": 0.25,
       "episodes": [
         [
-          60,
-          84
+          33,
+          42
         ],
         [
-          125,
+          65,
+          66
+        ],
+        [
+          68,
+          77
+        ],
+        [
+          93,
+          101
+        ],
+        [
+          128,
           137
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 33,
+          "end": 42,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 65,
+          "end": 66,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 68,
+          "end": 77,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        },
+        {
+          "start": 93,
+          "end": 101,
+          "kind": "humidity_flatline",
+          "direction": "positive",
+          "stuck_value": 100.0
+        },
+        {
+          "start": 128,
+          "end": 137,
+          "kind": "humidity_flatline",
+          "direction": "negative",
+          "stuck_value": 85.0
+        }
       ],
       "start_time": "2023-08-27T03:50:00+00:00",
       "end_time": "2023-08-28T03:40:00+00:00"

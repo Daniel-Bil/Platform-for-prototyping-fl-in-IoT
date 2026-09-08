@@ -1,8 +1,8 @@
 dataset_version,sensor_id,client_dir,fault_profile,source_kind,selected_rows,selected_start_time,selected_end_time,train_rows,train_anomaly_rate,val_rows,val_anomaly_rate,test_rows,test_anomaly_rate
-cleaned-real-controlled-faults-v1,df_RuralIoT_001,client_df_RuralIoT_001,temperature_drift,cleaned_real_ruraliot,960,2023-06-07T06:30:00+00:00,2023-06-13T22:20:00+00:00,672,0.25,144,0.25,144,0.25
-cleaned-real-controlled-faults-v1,df_RuralIoT_002,client_df_RuralIoT_002,temperature_bias,cleaned_real_ruraliot,960,2023-05-03T02:10:00+00:00,2023-05-09T18:00:00+00:00,672,0.25,144,0.25,144,0.25
-cleaned-real-controlled-faults-v1,df_RuralIoT_003,client_df_RuralIoT_003,single_feature_dropout,cleaned_real_ruraliot,960,2023-05-28T19:20:00+00:00,2023-06-04T11:10:00+00:00,672,0.25,144,0.25,144,0.25
-cleaned-real-controlled-faults-v1,df_RuralIoT_010,client_df_RuralIoT_010,multi_feature_dropout,cleaned_real_ruraliot,960,2023-07-15T19:00:00+00:00,2023-07-22T10:50:00+00:00,672,0.25,144,0.25,144,0.25
-cleaned-real-controlled-faults-v1,df_RuralIoT_21,client_df_RuralIoT_21,burst_noise,cleaned_real_ruraliot,960,2023-09-11T21:20:00+00:00,2023-09-18T13:10:00+00:00,672,0.25,144,0.25,144,0.25
-cleaned-real-controlled-faults-v1,df_RuralIoT_22,client_df_RuralIoT_22,humidity_flatline,cleaned_real_ruraliot,960,2023-08-21T11:50:00+00:00,2023-08-28T03:40:00+00:00,672,0.25,144,0.25,144,0.25
-cleaned-real-controlled-faults-v1,df_RuralIoT_23,client_df_RuralIoT_23,mixed_flatline_dropout,cleaned_real_ruraliot,960,2023-10-02T17:50:00+00:00,2023-10-09T09:40:00+00:00,672,0.25,144,0.25,144,0.25
+cleaned-real-controlled-faults-v2,df_RuralIoT_001,client_df_RuralIoT_001,temperature_drift,cleaned_real_ruraliot,960,2023-06-07T06:30:00+00:00,2023-06-13T22:20:00+00:00,672,0.25,144,0.25,144,0.25
+cleaned-real-controlled-faults-v2,df_RuralIoT_002,client_df_RuralIoT_002,temperature_bias,cleaned_real_ruraliot,960,2023-05-03T02:10:00+00:00,2023-05-09T18:00:00+00:00,672,0.25,144,0.25,144,0.25
+cleaned-real-controlled-faults-v2,df_RuralIoT_003,client_df_RuralIoT_003,single_feature_dropout,cleaned_real_ruraliot,960,2023-05-28T19:20:00+00:00,2023-06-04T11:10:00+00:00,672,0.25,144,0.25,144,0.25
+cleaned-real-controlled-faults-v2,df_RuralIoT_010,client_df_RuralIoT_010,multi_feature_dropout,cleaned_real_ruraliot,960,2023-07-15T19:00:00+00:00,2023-07-22T10:50:00+00:00,672,0.25,144,0.25,144,0.25
+cleaned-real-controlled-faults-v2,df_RuralIoT_21,client_df_RuralIoT_21,burst_noise,cleaned_real_ruraliot,960,2023-09-11T21:20:00+00:00,2023-09-18T13:10:00+00:00,672,0.25,144,0.25,144,0.25
+cleaned-real-controlled-faults-v2,df_RuralIoT_22,client_df_RuralIoT_22,humidity_flatline,cleaned_real_ruraliot,960,2023-08-21T11:50:00+00:00,2023-08-28T03:40:00+00:00,672,0.25,144,0.25,144,0.25
+cleaned-real-controlled-faults-v2,df_RuralIoT_23,client_df_RuralIoT_23,mixed_flatline_dropout,cleaned_real_ruraliot,960,2023-10-02T17:50:00+00:00,2023-10-09T09:40:00+00:00,672,0.25,144,0.25,144,0.25

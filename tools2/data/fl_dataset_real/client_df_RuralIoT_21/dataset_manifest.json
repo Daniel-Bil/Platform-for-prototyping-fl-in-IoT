@@ -1,13 +1,15 @@
 {
-  "dataset_version": "cleaned-real-controlled-faults-v1",
+  "dataset_version": "cleaned-real-controlled-faults-v2",
   "sensor_id": "df_RuralIoT_21",
   "client_dir": "client_df_RuralIoT_21",
   "source_kind": "cleaned_real_ruraliot",
-  "source_file": "/mnt/data/project_dataset_fixed/tools2/data/df_RuralIoT_21_CLEANED.csv",
+  "source_file": "/mnt/data/project_threshold_fixed/tools2/data/df_RuralIoT_21_CLEANED.csv",
   "fault_profile": "burst_noise",
   "target_anomaly_rate": 0.25,
   "seed": 42,
   "split_before_fault_injection": true,
+  "fault_direction_policy": "balanced_positive_negative_per_split",
+  "sequence_label_semantics": "classify_last_sample_in_input_window",
   "features": [
     "value_temp",
     "value_hum",
@@ -58,6 +60,57 @@
           584
         ]
       ],
+      "fault_variants": [
+        {
+          "start": 38,
+          "end": 73,
+          "kind": "burst_noise",
+          "feature": "value_acid",
+          "std": 0.45
+        },
+        {
+          "start": 264,
+          "end": 278,
+          "kind": "burst_noise",
+          "feature": "value_PV",
+          "std": 1.1
+        },
+        {
+          "start": 301,
+          "end": 323,
+          "kind": "burst_noise",
+          "feature": "value_PV",
+          "std": 1.1
+        },
+        {
+          "start": 427,
+          "end": 462,
+          "kind": "burst_noise",
+          "feature": "value_hum",
+          "std": 12.0
+        },
+        {
+          "start": 506,
+          "end": 540,
+          "kind": "burst_noise",
+          "feature": "value_acid",
+          "std": 0.45
+        },
+        {
+          "start": 549,
+          "end": 567,
+          "kind": "burst_noise",
+          "feature": "value_PV",
+          "std": 1.1
+        },
+        {
+          "start": 574,
+          "end": 584,
+          "kind": "burst_noise",
+          "feature": "value_temp",
+          "std": 2.5
+        }
+      ],
       "start_time": "2023-09-11T21:20:00+00:00",
       "end_time": "2023-09-16T13:10:00+00:00"
     },
@@ -68,13 +121,62 @@
       "anomaly_rate": 0.25,
       "episodes": [
         [
-          22,
-          42
+          24,
+          33
         ],
         [
-          126,
+          37,
+          46
+        ],
+        [
+          95,
+          96
+        ],
+        [
+          100,
+          109
+        ],
+        [
+          134,
           142
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 24,
+          "end": 33,
+          "kind": "burst_noise",
+          "feature": "value_temp",
+          "std": 2.5
+        },
+        {
+          "start": 37,
+          "end": 46,
+          "kind": "burst_noise",
+          "feature": "value_PV",
+          "std": 1.1
+        },
+        {
+          "start": 95,
+          "end": 96,
+          "kind": "burst_noise",
+          "feature": "value_acid",
+          "std": 0.45
+        },
+        {
+          "start": 100,
+          "end": 109,
+          "kind": "burst_noise",
+          "feature": "value_acid",
+          "std": 0.45
+        },
+        {
+          "start": 134,
+          "end": 142,
+          "kind": "burst_noise",
+          "feature": "value_acid",
+          "std": 0.45
+        }
       ],
       "start_time": "2023-09-16T13:20:00+00:00",
       "end_time": "2023-09-17T13:10:00+00:00"
@@ -86,13 +188,62 @@
       "anomaly_rate": 0.25,
       "episodes": [
         [
-          23,
-          42
+          25,
+          33
         ],
         [
-          118,
+          47,
+          56
+        ],
+        [
+          75,
+          77
+        ],
+        [
+          115,
+          124
+        ],
+        [
+          127,
           135
         ]
+      ],
+      "fault_variants": [
+        {
+          "start": 25,
+          "end": 33,
+          "kind": "burst_noise",
+          "feature": "value_temp",
+          "std": 2.5
+        },
+        {
+          "start": 47,
+          "end": 56,
+          "kind": "burst_noise",
+          "feature": "value_hum",
+          "std": 12.0
+        },
+        {
+          "start": 75,
+          "end": 77,
+          "kind": "burst_noise",
+          "feature": "value_temp",
+          "std": 2.5
+        },
+        {
+          "start": 115,
+          "end": 124,
+          "kind": "burst_noise",
+          "feature": "value_acid",
+          "std": 0.45
+        },
+        {
+          "start": 127,
+          "end": 135,
+          "kind": "burst_noise",
+          "feature": "value_hum",
+          "std": 12.0
+        }
       ],
       "start_time": "2023-09-17T13:20:00+00:00",
       "end_time": "2023-09-18T13:10:00+00:00"

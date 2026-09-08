@@ -14,9 +14,10 @@ EXPECTED_CADENCE = pd.Timedelta(minutes=10)
 
 
 def sequence_positive_rate(labels: np.ndarray, seq_len: int) -> float:
-    if len(labels) <= seq_len:
+    """Positive rate after causal windowing where y[t] is inside X-window."""
+    if len(labels) < seq_len:
         return float("nan")
-    return float(np.asarray(labels[seq_len:], dtype=float).mean())
+    return float(np.asarray(labels[seq_len - 1 :], dtype=float).mean())
 
 
 def main() -> None:
@@ -37,10 +38,20 @@ def main() -> None:
     rows: list[dict] = []
     expected_rows: dict[str, int] = {}
 
+    directional_profiles = {"temperature_drift", "temperature_bias", "humidity_flatline"}
+
     for client in clients:
         manifest_path = client / "dataset_manifest.json"
+        client_manifest = None
         if not manifest_path.exists():
             errors.append(f"{client.name}: missing dataset_manifest.json")
+        else:
+            client_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if client_manifest.get("sequence_label_semantics") != "classify_last_sample_in_input_window":
+                errors.append(f"{client.name}: wrong/missing sequence_label_semantics")
+            if client_manifest.get("fault_direction_policy") != "balanced_positive_negative_per_split":
+                errors.append(f"{client.name}: wrong/missing fault_direction_policy")
+
         for split in ("train", "val", "test"):
             path = client / f"{split}.csv"
             if not path.exists():
@@ -69,6 +80,29 @@ def main() -> None:
             if len(deltas) and not (deltas == EXPECTED_CADENCE).all():
                 errors.append(f"{client.name}/{split}: timestamps are not continuous 10-minute cadence")
             seq_rate = sequence_positive_rate(df["label"].to_numpy(), args.seq_len)
+
+            if client_manifest is not None:
+                profile = client_manifest.get("fault_profile")
+                split_info = client_manifest.get("splits", {}).get(split, {})
+                variants = split_info.get("fault_variants", [])
+                directional = [v for v in variants if v.get("direction") in {"positive", "negative"}]
+                if profile in directional_profiles:
+                    directions = {v.get("direction") for v in directional}
+                    if directions != {"positive", "negative"}:
+                        errors.append(
+                            f"{client.name}/{split}: {profile} must contain both fault directions; got {sorted(directions)}"
+                        )
+                elif profile == "mixed_flatline_dropout":
+                    flatline_dirs = {
+                        v.get("direction") for v in variants
+                        if v.get("kind") == "humidity_flatline" and v.get("direction") in {"positive", "negative"}
+                    }
+                    if flatline_dirs != {"positive", "negative"}:
+                        errors.append(
+                            f"{client.name}/{split}: mixed flatline component must contain both directions; "
+                            f"got {sorted(flatline_dirs)}"
+                        )
+
             rows.append({
                 "client": client.name,
                 "split": split,

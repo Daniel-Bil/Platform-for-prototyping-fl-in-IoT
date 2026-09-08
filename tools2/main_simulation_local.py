@@ -50,9 +50,9 @@ tf.random.set_seed(RANDOM_SEED)
 
 def create_sequences(X, y, seq_len):
     Xs, ys = [], []
-    for i in range(len(X) - seq_len):
-        Xs.append(X[i:(i + seq_len)])
-        ys.append(y[i + seq_len])
+    for end in range(seq_len - 1, len(X)):
+        Xs.append(X[end - seq_len + 1 : end + 1])
+        ys.append(y[end])
     return np.array(Xs), np.array(ys)
 
 
