@@ -122,7 +122,7 @@ def build_model_from_config(config: dict[str, Any], seq_len: int, num_features: 
                     filters=int(params.get("filters", 32)),
                     kernel_size=int(params.get("kernel_size", 3)),
                     activation=params.get("activation", "relu"),
-                    padding=params.get("padding", "same"),
+                    padding=params.get("padding", "valid"),
                     name=current_id,
                 )(x)
             elif node_type in {"MaxPooling1D", "MaxPooling2D"}:
