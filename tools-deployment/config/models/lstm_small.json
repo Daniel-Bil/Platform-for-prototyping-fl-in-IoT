@@ -1,0 +1,45 @@
+{
+  "name": "lstm_small",
+  "nodes": [
+    {
+      "id": "node_11",
+      "type": "Input",
+      "x": 2398.9999999999995,
+      "y": 248.1904761904762,
+      "params": {
+        "shape": "6,4"
+      }
+    },
+    {
+      "id": "node_12",
+      "type": "LSTM",
+      "x": 2378.047619047619,
+      "y": 403.42857142857144,
+      "params": {
+        "units": 8
+      }
+    },
+    {
+      "id": "node_13",
+      "type": "Dense",
+      "x": 2372.333333333333,
+      "y": 572,
+      "params": {
+        "units": 1,
+        "activation": "sigmoid"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "node_11",
+      "to": "node_12",
+      "isValid": true
+    },
+    {
+      "from": "node_12",
+      "to": "node_13",
+      "isValid": true
+    }
+  ]
+}

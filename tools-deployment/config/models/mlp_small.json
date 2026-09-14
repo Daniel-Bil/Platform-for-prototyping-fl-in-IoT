@@ -1,0 +1,58 @@
+{
+  "name": "mlp_small",
+  "nodes": [
+    {
+      "id": "node_6",
+      "type": "Input",
+      "x": 2362.4989568402607,
+      "y": 56.812727127944555,
+      "params": {
+        "shape": "6,4"
+      }
+    },
+    {
+      "id": "node_9",
+      "type": "Flatten",
+      "x": 2362.4989568402607,
+      "y": 225.27426558948298,
+      "params": {}
+    },
+    {
+      "id": "node_10",
+      "type": "Dense",
+      "x": 2361.72972607103,
+      "y": 381.4281117433291,
+      "params": {
+        "units": 16,
+        "activation": "relu"
+      }
+    },
+    {
+      "id": "node_11",
+      "type": "Dense",
+      "x": 2360.1912645325688,
+      "y": 514.5050348202521,
+      "params": {
+        "units": 1,
+        "activation": "sigmoid"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "node_6",
+      "to": "node_9",
+      "isValid": true
+    },
+    {
+      "from": "node_9",
+      "to": "node_10",
+      "isValid": true
+    },
+    {
+      "from": "node_10",
+      "to": "node_11",
+      "isValid": true
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "name": "cnn_large",
+  "nodes": [
+    {
+      "id": "node_18",
+      "type": "Input",
+      "x": 2379.9523809523807,
+      "y": 346.2857142857143,
+      "params": {
+        "shape": "6,4"
+      }
+    },
+    {
+      "id": "node_19",
+      "type": "Conv1D",
+      "x": 2373.2857142857138,
+      "y": 465.3333333333333,
+      "params": {
+        "filters": 32,
+        "kernel_size": 2,
+        "activation": "relu"
+      }
+    },
+    {
+      "id": "node_20",
+      "type": "Flatten",
+      "x": 2368.523809523809,
+      "y": 625.3333333333333,
+      "params": {}
+    },
+    {
+      "id": "node_21",
+      "type": "Dense",
+      "x": 2366.6190476190473,
+      "y": 766.2857142857142,
+      "params": {
+        "units": 16,
+        "activation": "relu"
+      }
+    },
+    {
+      "id": "node_22",
+      "type": "Dense",
+      "x": 2354.238095238095,
+      "y": 901.5238095238095,
+      "params": {
+        "units": 1,
+        "activation": "sigmoid"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "node_18",
+      "to": "node_19",
+      "isValid": true
+    },
+    {
+      "from": "node_19",
+      "to": "node_20",
+      "isValid": true
+    },
+    {
+      "from": "node_20",
+      "to": "node_21",
+      "isValid": true
+    },
+    {
+      "from": "node_21",
+      "to": "node_22",
+      "isValid": true
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-"""Keras model construction compatible with tools2/fl_model*.json."""
+"""Keras model construction compatible with the FL Builder/tools2 JSON graph format."""
 from __future__ import annotations
 
 import json
@@ -32,6 +32,7 @@ def build_model_from_config(config: dict[str, Any], seq_len: int, num_features: 
         raise ValueError(f"expected exactly one Input node, got {len(input_nodes)}")
 
     input_id = input_nodes[0]["id"]
+    # Dataset shape is authoritative. The shape shown in the GUI JSON is metadata only.
     keras_input = layers.Input(shape=(seq_len, num_features), name=input_id)
     tensor_map = {input_id: keras_input}
 
@@ -46,6 +47,30 @@ def build_model_from_config(config: dict[str, Any], seq_len: int, num_features: 
         adjacency[source].append(target)
         incoming[target].append(source)
         in_degree[target] += 1
+
+    def recurrent_needs_sequences(node_id: str) -> bool:
+        """Return True when an immediate downstream temporal layer needs a sequence.
+
+        The common GUI pattern LSTM/GRU -> Dense should return a vector, not a full
+        sequence. Stacked recurrent/Conv1D/pooling layers need sequence output.
+        """
+        temporal_consumers = {
+            "LSTM", "GRU", "Conv1D", "Conv2D", "MaxPooling1D", "MaxPooling2D"
+        }
+        transparent = {"Dropout", "BatchNorm", "BatchNormalization", "ReLU", "LeakyReLU"}
+        queue = list(adjacency[node_id])
+        seen: set[str] = set()
+        while queue:
+            child = queue.pop(0)
+            if child in seen:
+                continue
+            seen.add(child)
+            child_type = nodes[child].get("type")
+            if child_type in temporal_consumers:
+                return True
+            if child_type in transparent:
+                queue.extend(adjacency[child])
+        return False
 
     queue = [node_id for node_id, degree in in_degree.items() if degree == 0]
     visited: list[str] = []
@@ -68,19 +93,20 @@ def build_model_from_config(config: dict[str, Any], seq_len: int, num_features: 
                     filters=int(params.get("filters", 32)),
                     kernel_size=int(params.get("kernel_size", 3)),
                     activation=params.get("activation", "relu"),
-                    padding="same",
+                    padding=params.get("padding", "same"),
                     name=current_id,
                 )(x)
             elif node_type in {"MaxPooling1D", "MaxPooling2D"}:
                 x = layers.MaxPooling1D(
                     pool_size=int(params.get("pool_size", 2)),
-                    padding="same",
+                    padding=params.get("padding", "same"),
                     name=current_id,
                 )(x)
             elif node_type == "Flatten":
                 x = layers.Flatten(name=current_id)(x)
             elif node_type == "Dense":
                 if not adjacency[current_id]:
+                    # Final classifier is fixed to the binary anomaly-detection task.
                     x = layers.Dense(1, activation="sigmoid", name=current_id)(x)
                 else:
                     x = layers.Dense(
@@ -94,15 +120,21 @@ def build_model_from_config(config: dict[str, Any], seq_len: int, num_features: 
                 rnn_layer = layers.LSTM if node_type == "LSTM" else layers.GRU
                 x = rnn_layer(
                     units=int(params.get("units", 32)),
-                    return_sequences=bool(adjacency[current_id]),
+                    return_sequences=recurrent_needs_sequences(current_id),
                     name=current_id,
                 )(x)
             elif node_type == "Concatenate":
                 if not isinstance(x, list) or len(x) < 2:
                     raise ValueError("Concatenate requires at least two incoming tensors")
                 x = layers.Concatenate(name=current_id)(x)
+            elif node_type in {"BatchNorm", "BatchNormalization"}:
+                x = layers.BatchNormalization(name=current_id)(x)
             elif node_type == "ReLU":
                 x = layers.ReLU(name=current_id)(x)
+            elif node_type == "LeakyReLU":
+                slope = float(params.get("negative_slope", params.get("alpha", 0.3)))
+                # TensorFlow 2.14 uses `alpha`; newer Keras accepts negative_slope.
+                x = layers.LeakyReLU(alpha=slope, name=current_id)(x)
             else:
                 raise ValueError(f"unsupported layer type {node_type!r} at node {current_id!r}")
 

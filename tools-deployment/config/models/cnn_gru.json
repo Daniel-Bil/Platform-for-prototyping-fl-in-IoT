@@ -1,0 +1,61 @@
+{
+  "name": "cnn_gru",
+  "nodes": [
+    {
+      "id": "node_14",
+      "type": "Input",
+      "x": 2358.047619047619,
+      "y": 327.23809523809524,
+      "params": {
+        "shape": "6,4"
+      }
+    },
+    {
+      "id": "node_15",
+      "type": "Conv1D",
+      "x": 2359,
+      "y": 434.8571428571429,
+      "params": {
+        "filters": 8,
+        "kernel_size": 2,
+        "activation": "relu"
+      }
+    },
+    {
+      "id": "node_16",
+      "type": "GRU",
+      "x": 2356.1428571428573,
+      "y": 558.6666666666666,
+      "params": {
+        "units": 8
+      }
+    },
+    {
+      "id": "node_17",
+      "type": "Dense",
+      "x": 2353.2857142857138,
+      "y": 691.047619047619,
+      "params": {
+        "units": 1,
+        "activation": "sigmoid"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "node_14",
+      "to": "node_15",
+      "isValid": true
+    },
+    {
+      "from": "node_15",
+      "to": "node_16",
+      "isValid": true
+    },
+    {
+      "from": "node_16",
+      "to": "node_17",
+      "isValid": true
+    }
+  ]
+}
