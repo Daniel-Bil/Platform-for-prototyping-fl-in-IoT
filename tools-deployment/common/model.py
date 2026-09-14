@@ -7,11 +7,40 @@ from typing import Any
 
 
 def load_model_config(path: str | Path) -> dict[str, Any]:
+    """Load either supported model JSON schema and normalize it.
+
+    Supported inputs:
+      1. tools2/deployment wrapper: {"config": {...}, "architecture": {"nodes": [...], "edges": [...]}}
+      2. FL Builder export:       {"name": "...", "nodes": [...], "edges": [...]}
+
+    The rest of the deployment code always receives the wrapped form.
+    """
     with open(path, "r", encoding="utf-8") as handle:
         config = json.load(handle)
-    if not isinstance(config, dict) or "architecture" not in config:
-        raise ValueError("model JSON must contain an 'architecture' object")
-    return config
+
+    if not isinstance(config, dict):
+        raise ValueError("model JSON root must be an object")
+
+    if isinstance(config.get("architecture"), dict):
+        architecture = config["architecture"]
+        if not isinstance(architecture.get("nodes"), list) or not isinstance(architecture.get("edges"), list):
+            raise ValueError("'architecture' must contain 'nodes' and 'edges' arrays")
+        return config
+
+    # Native export produced by Daniel's FL Builder.
+    if isinstance(config.get("nodes"), list) and isinstance(config.get("edges"), list):
+        return {
+            "name": config.get("name", Path(path).stem),
+            "config": config.get("config", {}),
+            "architecture": {
+                "nodes": config["nodes"],
+                "edges": config["edges"],
+            },
+        }
+
+    raise ValueError(
+        "model JSON must contain either an 'architecture' object or top-level 'nodes' and 'edges' arrays"
+    )
 
 
 def build_model_from_config(config: dict[str, Any], seq_len: int, num_features: int):

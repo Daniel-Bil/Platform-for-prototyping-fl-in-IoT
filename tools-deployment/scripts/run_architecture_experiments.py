@@ -2,7 +2,7 @@
 """Run each JSON architecture as a separate benchmark campaign.
 
 Default architecture study intentionally changes only the model architecture:
-FedAvg, 7 clients, 20 rounds, 3 local epochs, batch 32, 5 repetitions.
+all FL methods, 7 clients, 20 rounds, 3 local epochs, batch 32, 5 repetitions.
 Each architecture gets its own output directory.
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--models-dir", default="tools-deployment/config/models")
     p.add_argument("--clients", type=int, default=7)
-    p.add_argument("--algorithms", default="FedAvg")
+    p.add_argument("--algorithms", default="FedAvg,FedProx,FedPAQ,FedMA,HierFedAvg")
     p.add_argument("--rounds", type=int, default=20)
     p.add_argument("--local-epochs", type=int, default=3)
     p.add_argument("--batch-size", type=int, default=32)
