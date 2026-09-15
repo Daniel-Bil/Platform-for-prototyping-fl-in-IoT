@@ -33,6 +33,26 @@ def write_status(path: Path, rows: list[dict[str, str]]) -> None:
         writer.writerows(rows)
 
 
+def campaign_complete(model_output: Path, expected_runs: int) -> tuple[bool, str]:
+    campaigns = sorted(
+        [p for p in model_output.glob("campaign-*") if (p / "campaign_status.csv").exists()],
+        key=lambda p: p.stat().st_mtime,
+    )
+    if not campaigns:
+        return False, "no campaign_status.csv found"
+    status_path = campaigns[-1] / "campaign_status.csv"
+    with status_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    completed_keys = {
+        (r.get("algorithm"), r.get("requested_clients"), r.get("repetition"))
+        for r in rows
+        if r.get("status") == "completed"
+    }
+    if len(completed_keys) != expected_runs:
+        return False, f"{len(completed_keys)}/{expected_runs} experiment configurations completed"
+    return True, str(campaigns[-1])
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--models-dir", default="tools-deployment/config/models")
@@ -81,21 +101,26 @@ def main():
         print(f"ARCHITECTURE: {model.stem}")
         print("=" * 78, flush=True)
         proc = subprocess.run(cmd, cwd=ROOT)
+        expected_runs = len([x for x in a.algorithms.split(",") if x.strip()]) * a.repetitions
+        complete, detail = campaign_complete(model_output, expected_runs)
+        ok = proc.returncode == 0 and complete
+        if not ok:
+            print(f"ARCHITECTURE INCOMPLETE: {model.stem}: {detail}", file=sys.stderr, flush=True)
 
         row = {
             "model": model.stem,
             "model_path": str(model_relative),
-            "status": "completed" if proc.returncode == 0 else "failed",
+            "status": "completed" if ok else "failed",
             "started_utc": started,
             "finished_utc": datetime.now(timezone.utc).isoformat(),
-            "returncode": str(proc.returncode),
+            "returncode": str(proc.returncode if proc.returncode != 0 else (0 if complete else 2)),
             "output_root": str(model_output.relative_to(ROOT)),
         }
         rows.append(row)
         write_status(status_file, rows)
 
-        if proc.returncode != 0 and a.fail_fast:
-            raise SystemExit(proc.returncode)
+        if not ok and a.fail_fast:
+            raise SystemExit(proc.returncode or 2)
 
     print(f"\nArchitecture study finished. Status: {status_file}")
     print(f"Results root: {base_output}")

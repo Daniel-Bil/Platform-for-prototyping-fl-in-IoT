@@ -38,8 +38,23 @@ def ci95(values: list[float]) -> float:
 
 def collect(campaign: Path):
     runs=[]; rounds=[]; participants=[]
+
+    # campaign_status.csv is authoritative. A failed run can still leave a complete-looking
+    # server result directory (for example when a round had too few logical clients).
+    # Never let such a directory leak into thesis aggregates.
+    status_rows = read_csv(campaign / "campaign_status.csv")
+    completed_ids = {
+        r.get("run_id")
+        for r in status_rows
+        if r.get("status") == "completed" and r.get("run_id")
+    }
+    use_status_filter = bool(status_rows)
+
     for sp in sorted(campaign.rglob("summary.json")):
         rd=sp.parent; summary=read_json(sp); config=read_json(rd/"config.json") if (rd/"config.json").exists() else {}
+        run_id = summary.get("run_id", rd.name)
+        if use_status_filter and run_id not in completed_ids:
+            continue
         req=int(summary.get("requested_clients") or config.get("requested_clients") or 0)
         rep=summary.get("repetition", config.get("repetition")); seed=summary.get("seed", config.get("seed")); alg=summary.get("algorithm", config.get("algorithm"))
         pr=read_csv(rd/"participants.csv")
@@ -47,7 +62,7 @@ def collect(campaign: Path):
         client_train=[v for v in client_train if v is not None]
         fm=summary.get("final_metrics") or {}
         rr={
-            "run_id": summary.get("run_id", rd.name), "algorithm": alg, "requested_clients": req,
+            "run_id": run_id, "algorithm": alg, "requested_clients": req,
             "repetition": rep, "seed": seed, "status": summary.get("status"), "failure_reason": summary.get("failure_reason"),
             "completed_rounds": summary.get("completed_rounds"), "git_commit": config.get("git_commit"),
             "final_test_loss": fm.get("test_loss"), "final_accuracy": fm.get("accuracy"), "final_precision": fm.get("precision"),

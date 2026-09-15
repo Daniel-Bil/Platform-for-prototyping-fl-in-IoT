@@ -143,6 +143,7 @@ def run_ansible_with_retries(
     retry_delay: float,
 ):
     """Retry transient Ansible unreachable-host failures (exit code 4)."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text("", encoding="utf-8")
     last_rc = None
     for attempt in range(1, retries + 1):
@@ -564,8 +565,21 @@ def main():
             check=False,
         )
 
+    expected = {
+        (alg, n, rep)
+        for n in counts
+        for rep in range(1, a.repetitions + 1)
+        for alg in algs
+    }
+    unresolved = sorted(expected - done, key=lambda x: (x[1], x[2], x[0]))
+
     print(f"\nCampaign finished: {campaign}")
     print(f"Analysis: {campaign / 'analysis'}")
+    if unresolved:
+        print(f"INCOMPLETE: {len(unresolved)} experiment configuration(s) are unresolved:", file=sys.stderr)
+        for alg, n, rep in unresolved:
+            print(f"  clients={n} repetition={rep} algorithm={alg}", file=sys.stderr)
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
